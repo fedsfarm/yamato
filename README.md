@@ -8,6 +8,8 @@ Official repo: https://git.zeroarch.org/root/yamato
 
 Click on yamato-firefox.xpi in [releases](https://github.com/zeroarchroot/yamato/releases) or check out [yamato.zeroarch.org](https://yamato.zeroarch.org)
 
+If firefox doesn't allow it download [yamato-firefox.xpi](https://git.zeroarch.org/root/yamato/raw/branch/main/yamato-firefox.xpi), browse to about:addons, click on the settings icon, and press "Install add-on from file", then select it
+
 Currently I'm awaiting the verification in their store
 
 ## Google Chrome / Chromium / Edge / Brave / Opera
@@ -24,6 +26,7 @@ It should work in Firefox Mobile, everything else isn't tested
 
 ## Todo:
 
+- [ ] CI pipeline
 - [ ] Migrate to manifest v3
 - [ ] Fix opera and possible browser-specific issues
 - [ ] Add stats, streaks, and different statuses
@@ -35,3 +38,7 @@ It should work in Firefox Mobile, everything else isn't tested
 [Join #main:zeroarch.org on matrix](https://matrix.to/#/#main:zeroarch.org)
 or
 [DM @root:zeroarch.org](https://matrix.to/#/@root:zeroarch.org)
+
+## If you want to buy me some pizza with crypto
+
+XMR: 42uxSBp4aMyTAsPCMGEwHvJyGpemr1c7kdjtFsD5tnEsU7XsnYMjseyXBzLWHkruSWFGbQWagsh31bBRdU7vDNUBAzm1Mo4

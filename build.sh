@@ -18,21 +18,25 @@ SOURCE_FILES=(
 build() {
   local platform="$1"
   local manifest_file=""
+  local dist_dir=""
+  local output_file=""
 
   case "$platform" in
     chrome)
       manifest_file="manifest.chrome.json"
+      dist_dir="dist-chrome"
+      output_file="yamato-chrome.zip"
       ;;
     firefox)
       manifest_file="manifest.firefox.json"
+      dist_dir="dist-firefox"
+      output_file="yamato-firefox.xpi"
       ;;
     *)
-      echo "Unknown platform: $platform. Use 'chrome' or 'firefox'."
+      echo "Unknown platform: $platform."
       exit 1
       ;;
   esac
-
-  local dist_dir="dist-$platform"
 
   if [ -d "$dist_dir" ]; then
     rm -rf "$dist_dir"
@@ -47,11 +51,13 @@ build() {
       cp "$file" "$dist_dir/$file"
     fi
   done
-  
-  (cd "$dist_dir" && zip -r "../yamato-${platform}.zip" .)
+
+  (cd "$dist_dir" && zip -r "../$output_file" .)
   rm -rf "$dist_dir"
-  echo "Build complete for $platform. Zip created: dist-${platform}.zip"
+
+  echo "Build complete for $platform. Output created: $output_file"
 }
+
 
 build "chrome"
 build "firefox"
