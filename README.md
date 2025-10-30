@@ -26,7 +26,7 @@ It should work in Firefox Mobile, everything else isn't tested
 
 ## Todo:
 
-- [ ] CI pipeline
+- [x] CI pipeline
 - [ ] Migrate to manifest v3
 - [ ] Fix opera and possible browser-specific issues
 - [ ] Add stats, streaks, and different statuses
