@@ -1,13 +1,17 @@
 {
-  "manifest_version": 2,
+  "manifest_version": 3,
   "name": "Yamato",
   "version": "1.0",
   "permissions": [
     "tabs",
-    "<all_urls>",
-    "storage"
+    "storage",
+    "scripting",
+    "offscreen"
   ],
-  "browser_action": {
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
     "default_popup": "popup.html"
   },
   "commands": {
@@ -19,15 +23,20 @@
     }
   },
   "background": {
-      "page":"background.html"
+    "service_worker": "background.js"
   },
   "web_accessible_resources": [
-    "public/vergil.mp3",
-    "public/vergil.webm",
-    "vergil.jpeg"
+    {
+      "resources": [
+        "public/vergil.mp3",
+        "public/vergil.webm",
+        "vergil.jpeg",
+        "public/*"
+      ],
+      "matches": ["<all_urls>"]
+    }
   ],
   "description": "Prevents you from being unmotivated",
-
   "icons": {
     "48": "vergil.jpeg"
   }

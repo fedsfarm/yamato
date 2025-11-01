@@ -4,11 +4,9 @@ Prevents you from being unmotivated
 
 Official repo: https://git.zeroarch.org/root/yamato
 
-## Firefox / Librewolf
+## Firefox ESR/Dev/Nightly / Librewolf
 
-Click on yamato-firefox.xpi in [releases](https://github.com/zeroarchroot/yamato/releases) or check out [yamato.zeroarch.org](https://yamato.zeroarch.org)
-
-If firefox doesn't allow it download [yamato-firefox.xpi](https://git.zeroarch.org/root/yamato/raw/branch/main/yamato-firefox.xpi), browse to about:addons, click on the settings icon, and press "Install add-on from file", then select it
+Click on the latest yamato-firefox.xpi in [releases](https://github.com/zeroarchroot/yamato/releases) or check out [yamato.zeroarch.org](https://yamato.zeroarch.org)
 
 Currently I'm awaiting the verification in their store
 
@@ -27,7 +25,7 @@ It should work in Firefox Mobile, everything else isn't tested
 ## Todo:
 
 - [x] CI pipeline
-- [ ] Migrate to manifest v3
+- [x] Migrate to manifest v3
 - [ ] Fix opera and possible browser-specific issues
 - [ ] Add stats, streaks, and different statuses
 - [ ] Judgement cut media before loading

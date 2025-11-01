@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   executeBtn.addEventListener('click', () => {
     clickSound2.play().catch(e => console.log('Sound play failed:', e));
-    browser.runtime.sendMessage({ action: 'executeRun' }, (response) => {
+    browser.runtime.sendMessage({ action: 'executeRun', force: true }, (response) => {
       if (response && response.success) {
         console.log('Executed run.js on current tab');
       }

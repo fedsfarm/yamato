@@ -3,6 +3,8 @@
 SOURCE_FILES=(
   "background.html"
   "background.js"
+  "offscreen.html"
+  "offscreen.js"
   "popup.html"
   "popup.js"
   "run.js"
@@ -53,7 +55,7 @@ build() {
   done
 
   (cd "$dist_dir" && zip -r "../$output_file" .)
-  rm -rf "$dist_dir"
+  #rm -rf "$dist_dir"
 
   echo "Build complete for $platform. Output created: $output_file"
 }
