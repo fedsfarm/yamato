@@ -27,8 +27,10 @@ It should work in Firefox Mobile, everything else isn't tested
 - [x] CI pipeline
 - [x] Migrate to manifest v3
 - [ ] Fix opera and possible browser-specific issues
-- [ ] Add stats, streaks, and different statuses
+- [ ] Add toggles and stats
+- [ ] Add streaks, and different statuses
 - [ ] Judgement cut media before loading
+- [ ] Implement and test mobile
 - [ ] Upload it to every possible store 
 
 ## Questions, bugs, suggestions, just wanna talk?

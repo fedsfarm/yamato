@@ -51,7 +51,6 @@ let audioContext;
     console.error('Startup storage error:', err);
   }
 
-  // Initialize offscreen document for audio playback if supported (Chrome)
   if (chrome.offscreen) {
     try {
       const hasDoc = await chrome.offscreen.hasDocument();
