@@ -2,13 +2,15 @@
 
 Prevents you from being unmotivated
 
-Official repo: https://git.zeroarch.org/root/yamato
+Homepage : [yamato.zeroarch.org](https://yamato.zeroarch.org)
+
+Official repo: [git.zeroarch.org](https://git.zeroarch.org/root/yamato)
 
 ## Firefox ESR/Dev/Nightly / Librewolf
 
-Click on the latest yamato-firefox.xpi in [releases](https://github.com/zeroarchroot/yamato/releases) or check out [yamato.zeroarch.org](https://yamato.zeroarch.org)
+[Download from Firefox ADD-ONS](https://addons.mozilla.org/en-US/firefox/addon/yamato-blocker/)
 
-1.0 version: https://addons.mozilla.org/en-US/firefox/addon/yamato-blocker/
+Or use yamato-firefox.xpi in [releases](https://github.com/zeroarchroot/yamato/releases)
 
 ## Google Chrome / Chromium / Edge / Brave / Opera
 
