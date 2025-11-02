@@ -8,7 +8,7 @@ Official repo: https://git.zeroarch.org/root/yamato
 
 Click on the latest yamato-firefox.xpi in [releases](https://github.com/zeroarchroot/yamato/releases) or check out [yamato.zeroarch.org](https://yamato.zeroarch.org)
 
-Currently I'm awaiting the verification in their store
+1.0 version: https://addons.mozilla.org/en-US/firefox/addon/yamato-blocker/
 
 ## Google Chrome / Chromium / Edge / Brave / Opera
 
