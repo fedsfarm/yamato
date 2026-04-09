@@ -1,10 +1,16 @@
 # Yamato
 
+![Demo](demo.gif)
+
 Prevents you from being unmotivated
 
-Homepage : [yamato.zeroarch.org](https://yamato.zeroarch.org)
+Homepage : [yamato.feds.farm](https://yamato.feds.farm)
 
-Official repo: [git.zeroarch.org](https://git.zeroarch.org/root/yamato)
+Official repo: [git.feds.farm](https://git.feds.farm/root/yamato)
+
+# Warning
+
+Some browsers may block media autoplaying. Make sure it's enabled, otherwise Vergil won't be able to slice your page. If it happens, then usually you'll see an icon appear on top near the url scheme after the page arrows. Check your browser settings if it didn't happen.
 
 ## Firefox ESR/Dev/Nightly / Librewolf
 
@@ -24,11 +30,8 @@ Or use yamato-firefox.xpi in [releases](https://github.com/zeroarchroot/yamato/r
 
 It should work in Firefox Mobile, everything else isn't tested
 
-## Todo:
+## Probably in future releases
 
-- [x] CI pipeline
-- [x] Migrate to manifest v3
-- [ ] Fix opera and possible browser-specific issues
 - [ ] Add toggles and stats
 - [ ] Add streaks, and different statuses
 - [ ] Judgement cut media before loading
@@ -37,9 +40,9 @@ It should work in Firefox Mobile, everything else isn't tested
 
 ## Questions, bugs, suggestions, just wanna talk?
 
-[Join #main:zeroarch.org on matrix](https://matrix.to/#/#main:zeroarch.org)
+[Join #main:feds.farm on matrix](https://matrix.to/#/#main:feds.farm)
 or
-[DM @root:zeroarch.org](https://matrix.to/#/@root:zeroarch.org)
+[DM @root:feds.farm](https://matrix.to/#/@root:feds.farm)
 
 ## If you want to buy me some pizza with crypto
 
