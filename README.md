@@ -27,7 +27,9 @@ Or use yamato-firefox.xpi in [releases](https://github.com/zeroarchroot/yamato/r
 ## Android / IOS
 
 It should work on Firefox Mobile
+
 Some users report that it works on forks like Waterfox and IronFox 
+
 Everything else wasn't tested, feel free to DM your experience
 
 ## Probably in future releases
@@ -49,4 +51,5 @@ Also you can [join #main:feds.farm on matrix](https://matrix.to/#/#main:feds.far
 You can add a comment to the transaction or dm me if you want to see your name here
 
 BTC: bc1p2xkwf9elq8wgajtq2cc6zthuh4k998tgnk6365cnjqgal7mpd09q4jtfq8
+
 XMR: 42uxSBp4aMyTAsPCMGEwHvJyGpemr1c7kdjtFsD5tnEsU7XsnYMjseyXBzLWHkruSWFGbQWagsh31bBRdU7vDNUBAzm1Mo4
