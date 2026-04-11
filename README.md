@@ -18,17 +18,17 @@ Some browsers may block media autoplaying. Make sure it's enabled, otherwise Ver
 
 Or use yamato-firefox.xpi in [releases](https://github.com/zeroarchroot/yamato/releases)
 
-## Google Chrome / Chromium / Edge / Brave / Opera
+## Google Chrome / Chromium / Edge / Brave / Opera / Chromium-based browsers in general
 
 1. Download and unpack https://git.zeroarch.org/root/yamato/raw/branch/main/yamato-chrome.zip
 2. Browse to chrome://extensions/ and press enable the developer mode (top-right corner)
 3. Load unpacked -> select the location with the unpacked .zip
 
-- Some features might not work in Opera
-
 ## Android / IOS
 
-It should work in Firefox Mobile, everything else isn't tested
+It should work on Firefox Mobile
+Some users report that it works on forks like Waterfox and IronFox 
+Everything else wasn't tested, feel free to DM your experience
 
 ## Probably in future releases
 
@@ -38,12 +38,15 @@ It should work in Firefox Mobile, everything else isn't tested
 - [ ] Implement and test mobile
 - [ ] Upload it to every possible store 
 
-## Questions, bugs, suggestions, just wanna talk?
+## Questions, bugs, suggestions, chat
 
-[Join #main:feds.farm on matrix](https://matrix.to/#/#main:feds.farm)
-or
-[DM @root:feds.farm](https://matrix.to/#/@root:feds.farm)
+Please, open an issue and include as much info as possible
+
+Also you can [join #main:feds.farm on matrix](https://matrix.to/#/#main:feds.farm) or [DM @root:feds.farm](https://matrix.to/#/@root:feds.farm) on matrix
 
 ## If you want to buy me some pizza with crypto
 
+You can add a comment to the transaction or dm me if you want to see your name here
+
+BTC: bc1q70v6kscyjv2pv3rkeu76pa2jvarulc4rw5x9y5
 XMR: 8BzvW543WDsHxo5Xh3ZdcB2ZusYtQtr8NHRyhyxEkZEZTjjdoRPa45dXbRU3df21tTQgnctBJgYkd3QFEDbppnrh51uMEeo
