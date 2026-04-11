@@ -48,8 +48,7 @@ Also you can [join #main:feds.farm on matrix](https://matrix.to/#/#main:feds.far
 
 ## If you want to buy me some pizza with crypto
 
-You can add a comment to the transaction or dm me if you want to see your name here
+I'd appreciate that. You can add a comment to the transaction or dm me if you want to see your name here
 
 BTC: bc1p2xkwf9elq8wgajtq2cc6zthuh4k998tgnk6365cnjqgal7mpd09q4jtfq8
-
 XMR: 42uxSBp4aMyTAsPCMGEwHvJyGpemr1c7kdjtFsD5tnEsU7XsnYMjseyXBzLWHkruSWFGbQWagsh31bBRdU7vDNUBAzm1Mo4
