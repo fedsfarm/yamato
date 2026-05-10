@@ -32,9 +32,8 @@ Doing it right now
 
 ## Chrome/chromium/edge
 
-\>SAAR LEAK YOUR ID AND PROVIDE YOUR CARD DETAILS SO MY COUNTRYMEN CAN SCAM YOUR GRANNY
 
-Not doing that. Chrome/chromium/edge users can:
+https://feds.farm/blog/posts/yamato2-0/#what-s-the-deal-with-chrome-chromium-and-edge
 
 1. Download and unpack the latest version https://github.com/zeroarchroot/yamato/releases/
 2. Browse to chrome://extensions/ and press enable the developer mode (top-right corner)
