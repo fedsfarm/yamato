@@ -1,18 +1,22 @@
 {
   "manifest_version": 3,
   "name": "Yamato",
-  "version": "1.1.1",
+  "version": "2.0.0",
+  "description": "Prevents you from being unmotivated",
   "permissions": [
     "tabs",
     "storage",
     "scripting",
-    "offscreen"
+    "offscreen",
+    "webRequest",
+    "webNavigation"
   ],
   "host_permissions": [
     "<all_urls>"
   ],
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": "vergil.png"
   },
   "commands": {
     "execute-run": {
@@ -28,16 +32,17 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "public/vergil.mp3",
-        "public/vergil.webm",
-        "vergil.jpeg",
-        "public/*"
+        "vergil.png",
+        "public/*",
+        "pages/*"
       ],
       "matches": ["<all_urls>"]
     }
   ],
-  "description": "Prevents you from being unmotivated",
   "icons": {
-    "48": "vergil.jpeg"
+    "16": "vergil.png",
+    "32": "vergil.png",
+    "48": "vergil.png",
+    "128": "vergil.png"
   }
 }

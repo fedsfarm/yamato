@@ -1,54 +1,103 @@
 # Yamato
+[![rating](https://img.shields.io/amo/rating/yamato-blocker?label=Firefox)](https://addons.mozilla.org/en-US/firefox/addon/yamato-blocker/) 
+[![license](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/zeroarchroot/yamato/blob/main/LICENSE) 
 
-![Demo](demo.gif)
+![Demo](demo/demo.gif)
 
 Prevents you from being unmotivated
 
-Homepage : [yamato.feds.farm](https://yamato.feds.farm)
+Latest update: [feds.farm/posts/yamato2-0/](https://feds.farm/blog/posts/yamato2-0/)
 
-Official repo: [git.feds.farm](https://git.feds.farm/root/yamato)
+Homepage: [yamato.feds.farm](https://yamato.feds.farm) 
+
+[#stopciaporn](https://feds.farm)
+
+[![#main:feds.farm](https://escape.feds.farm/feds.png)](https://escape.feds.farm/#main:feds.farm) 
 
 # Warning
 
-Some browsers may block media autoplaying. Make sure it's enabled, otherwise Vergil won't be able to slice your page. If it happens, then usually you'll see an icon appear on top near the url scheme after the page arrows. Check your browser settings if it didn't happen.
+~~Glowies want you to watch porn~~ some browsers may block media autoplaying. The 2.0 version slightly hacks that principle, but make sure it isn't blocked if a video/audio doesn't play.
 
-## Firefox ESR/Dev/Nightly / Librewolf
+## Firefox and forks
 
 [Download from Firefox ADD-ONS](https://addons.mozilla.org/en-US/firefox/addon/yamato-blocker/)
 
-Or use yamato-firefox.xpi in [releases](https://github.com/zeroarchroot/yamato/releases)
+## Opera
 
-## Google Chrome / Chromium / Edge / Brave / Opera / Chromium-based browsers in general
+Doing it right now
 
-1. Download and unpack https://git.zeroarch.org/root/yamato/raw/branch/main/yamato-chrome.zip
+## Ungoogled chromium
+
+Doing it right now
+
+## Chrome/chromium/edge
+
+\>SAAR LEAK YOUR ID AND PROVIDE YOUR CARD DETAILS SO MY COUNTRYMEN CAN SCAM YOUR GRANNY
+
+Not doing that. Chrome/chromium/edge users can:
+
+1. Download and unpack the latest version https://github.com/zeroarchroot/yamato/releases/
 2. Browse to chrome://extensions/ and press enable the developer mode (top-right corner)
-3. Load unpacked -> select the location with the unpacked .zip
+3. Load unpacked -> select the location with an unpacked .zip
+
+Since the auto updates aren't working you can subscribe to my blog https://feds.farm/blog/ and manage them manually
+
+Consider switching to firefox, though
 
 ## Android / IOS
 
-It should work on Firefox Mobile
+It should work on Firefox Mobile and forks
 
-Some users report that it works on forks like Waterfox and IronFox 
+## Privacy
 
-Everything else wasn't tested, feel free to DM your experience
-
-## Probably in future releases
-
-- [ ] Add toggles and stats
-- [ ] Add streaks, and different statuses
-- [ ] Judgement cut media before loading
-- [ ] Implement and test mobile
-- [ ] Upload it to every possible store 
+It does 0 network requests
 
 ## Questions, bugs, suggestions, chat
 
-Please, open an issue and include as much info as possible
+Feel free to join our matrix room [#main:feds.farm](https://escape.feds.farm#main:feds.farm) 
 
-Also you can [join #main:feds.farm on matrix](https://matrix.to/#/#main:feds.farm) or [DM @root:feds.farm](https://matrix.to/#/@root:feds.farm) on matrix
+My DMs on matrix (prefered) [@root:feds.farm](https://escape.feds.farm#@root:feds.farm) or email [root@feds.farm](mailto:root@feds.farm)
 
-## If you want to buy me some pizza with crypto
+If you want to contribute feel free to open a pull request
 
-I'd appreciate that. You can add a comment to the transaction or dm me if you want to see your name here
+## Credits:
+
+### Videos
+
+Vergil status by [@terikuruzu5424](https://www.youtube.com/@terikuruzu5424)
+
+Dante status by [@lambiticousroofius2680](https://www.youtube.com/@lambiticousroofius2680)
+
+Secret status by [@othertin](https://www.youtube.com/@othertin)
+
+Nero status by [@GenAlphaPro](https://www.youtube.com/@GenAlphaPro)
+
+Ranks by [@thescarletphoenix7894](https://www.youtube.com/@thescarletphoenix7894)
+
+### Music
+
+https://www.youtube.com/watch?v=jozqnG_32i0
+https://www.youtube.com/watch?v=pvy9km7g6fw
+https://www.youtube.com/watch?v=xti_6Bzpa8A
+https://www.youtube.com/watch?v=eICijnr1k_I
+
+### Misc
+
+Blocklist:
+[Bon-Appetit/porn-domains](https://github.com/Bon-Appetit/porn-domains)
+
+All backgrounds are from my bottomless directory, contact me if you're an author
+
+### Any issues?
+
+Contact [root@feds.farm](mailto:root@feds.farm)
+
+I'm not monetizing this, but...
+
+## You always can buy me some pizza
 
 BTC: bc1q70v6kscyjv2pv3rkeu76pa2jvarulc4rw5x9y5
+
 XMR: 8BzvW543WDsHxo5Xh3ZdcB2ZusYtQtr8NHRyhyxEkZEZTjjdoRPa45dXbRU3df21tTQgnctBJgYkd3QFEDbppnrh51uMEeo
+
+DM me if you need a different method or something else

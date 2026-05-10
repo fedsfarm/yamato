@@ -1,9 +1,13 @@
 {
   "devDependencies": {
+    "@crxjs/vite-plugin": "^2.4.0",
+    "vite": "^8.0.11",
     "web-ext": "^8.10.0"
   },
   "scripts": {
     "build": "./build.sh",
+    "dev:firefox": "web-ext run",
+    "dev:chromium": "chromium --disable-extensions-except=dist-chrome --load-extension=dist-chrome --user-data-dir=/tmp/chrome-ext-dev",
     "dev": "web-ext run"
   }
 }
