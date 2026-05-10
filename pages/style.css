@@ -1,0 +1,226 @@
+:root {
+    --bg: #000000;
+    --green: #00ff41;
+    --orange: #ff6600;
+    --muted: rgba(0, 255, 65, 0.75);
+    --radius: 12px;
+    font-family: 'Courier New', Courier, monospace;
+}
+ks
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    height: 100%;
+    overflow-x: hidden;
+    font-size: 16px;
+    color: var(--green);
+}
+
+body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    position: relative;
+}
+
+/* Background */
+.video-wrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    filter: blur(4px) brightness(0.5);
+}
+
+.video-wrapper video {
+    position: absolute;
+    top: -20%;
+    left: 50%;
+    width: 100vw;
+    height: 120vh;
+    object-fit: cover;
+    transform: translateX(-50%);
+}
+
+/* Layout */
+main.wrap {
+    width: 85%;
+    max-width: 1100px;
+    padding: 40px;
+    border-radius: var(--radius);
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(12px);
+    display: flex;
+    gap: 32px;
+    border: 1px solid rgba(0, 255, 65, 0.2);
+    flex-wrap: wrap;
+}
+
+/* Sections */
+.content {
+    flex: 1 1 400px;
+    min-width: 280px;
+}
+
+.video-panel {
+    flex: 1 1 300px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.video-panel video {
+    max-width: 100%;
+    border-radius: var(--radius);
+}
+
+/* Branding */
+.brand {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.badge {
+    background: var(--green);
+    color: var(--bg);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+/* Text */
+h1 {
+    font-size: 2rem;
+    margin: 12px 0;
+}
+
+h2 {
+    font-size: 1.2rem;
+    color: var(--muted);
+    margin-bottom: 12px;
+}
+
+p {
+    font-size: 1.1rem;
+    color: var(--muted);
+    margin-bottom: 16px;
+}
+
+a {
+    font-size: 1.1rem;
+    color: var(--green);
+    margin-bottom: 16px;
+}
+
+/* Buttons */
+.buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+a.btn {
+    padding: 10px 18px;
+    border-radius: 12px;
+    text-decoration: none;
+    color: var(--green);
+    border: 1px solid rgba(0, 255, 65, 0.4);
+    font-weight: 600;
+}
+
+a.btn.primary {
+    background: var(--green);
+    color: var(--bg);
+    border: none;
+}
+
+/* Back link (ONLY orange usage) */
+.back {
+    color: var(--orange);
+    text-decoration: underline;
+    transition: 0.2s;
+}
+
+.back:hover {
+    color: #ff8833;
+    text-shadow: 0 0 6px var(--orange);
+}
+
+/* Terminal styles for install and update pages */
+.terminal {
+    background: rgba(0, 0, 0, 0.8);
+    border: 1px solid var(--green);
+    border-radius: var(--radius);
+    padding: 20px;
+    text-align: center;
+    max-width: 600px;
+    margin: 20px auto;
+}
+
+button {
+    padding: 10px 18px;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--green);
+    border: 1px solid rgba(0, 255, 65, 0.4);
+    font-weight: 600;
+    cursor: pointer;
+    margin: 5px;
+    font-family: inherit;
+    font-size: inherit;
+}
+
+button:hover {
+    background: var(--green);
+    color: var(--bg);
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius);
+}
+
+.changelog-list {
+    text-align: left;
+    list-style: none;
+    padding: 0;
+    margin: 20px 0;
+}
+
+.changelog-list p {
+    margin: 10px 0;
+    color: var(--muted);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    main.wrap {
+        flex-direction: column;
+        padding: 30px;
+    }
+
+    h1 {
+        font-size: 1.6rem;
+    }
+
+    p {
+        font-size: 1rem;
+    }
+
+    .terminal {
+        padding: 15px;
+        margin: 10px auto;
+    }
+}

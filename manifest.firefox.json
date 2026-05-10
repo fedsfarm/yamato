@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Yamato",
-  "version": "1.1.1",
+  "version": "2.0.0",
   "description": "Prevents you from being unmotivated",
   "action": {
     "default_popup": "popup.html",
@@ -10,7 +10,9 @@
   "permissions": [
     "tabs",
     "storage",
-    "scripting"
+    "scripting",
+    "webRequest",
+    "webRequestBlocking"
   ],
   "content_scripts": [
     {
@@ -36,9 +38,9 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "public/vergil.mp3",
-        "public/vergil.webm",
-        "vergil.jpeg"
+        "vergil.png",
+        "public/*",
+        "pages/*"
       ],
       "matches": [
         "<all_urls>"
@@ -46,7 +48,10 @@
     }
   ],
   "icons": {
-    "48": "vergil.jpeg"
+    "48": "vergil.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'sha256-WFiTe1ugrq+I+wTa1Kve4fwMWwJrc6bN2OOKr6uqxnU=' 'sha256-sERmrpxP+y4GKibh7W2+Wvnu+4hK84NX/0MJSLxkvho=' 'sha256-jqxtvDkBbRAl9Hpqv68WdNOieepg8tJSYu1xIy7zT34=' 'sha256-zL2UZaw4HjfCCigPBFeMknlz2nCwU55GB1eAFhRGxD8=' 'sha256-pL75uq2ZqjOUlOCnIqLgaGu3vcVrFFEuebvOWH+YG+0='; object-src 'self';"
   },
   "browser_specific_settings": {
     "gecko": {

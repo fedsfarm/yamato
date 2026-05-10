@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-SOURCE_FILES=(
+ROOT_FILES=(
   "background.html"
   "background.js"
   "offscreen.html"
@@ -8,13 +8,7 @@ SOURCE_FILES=(
   "popup.html"
   "popup.js"
   "run.js"
-  "vergil.jpeg"
-  "public/background.jpg"
-  "public/block.txt"
-  "public/click.mp3"
-  "public/schum.mp3"
-  "public/vergil.mp3"
-  "public/vergil.webm"
+  "vergil.png"
 )
 
 build() {
@@ -47,9 +41,11 @@ build() {
 
   cp "$manifest_file" "$dist_dir/manifest.json"
 
-  for file in "${SOURCE_FILES[@]}"; do
+  cp -r public "$dist_dir/"
+  cp -r pages "$dist_dir/"
+
+  for file in "${ROOT_FILES[@]}"; do
     if [ -f "$file" ]; then
-      mkdir -p "$dist_dir/$(dirname "$file")"
       cp "$file" "$dist_dir/$file"
     fi
   done

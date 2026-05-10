@@ -1,6 +1,6 @@
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'playSound') {
-    const audio = new Audio(chrome.runtime.getURL('public/vergil.mp3'));
+    const audio = new Audio(chrome.runtime.getURL('public/sounds/' + (message.sound || 'vergil.mp3')));
     const onEnded = () => {
       chrome.runtime.sendMessage({action: 'soundEnded'});
       audio.removeEventListener('ended', onEnded);

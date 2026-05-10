@@ -3,3 +3,7 @@ web-ext-artifacts
 package-lock.json
 dist-chrome
 dist-firefox
+originals
+dev
+.kilo
+.gitignore
