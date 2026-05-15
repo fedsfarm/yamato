@@ -24,14 +24,9 @@ Homepage: [yamato.feds.farm](https://yamato.feds.farm)
 
 ## Opera
 
-Doing it right now
-
-## Ungoogled chromium
-
-Doing it right now
+[Well, well, well...](https://forums.opera.com/topic/16609/very-long-extension-moderation-process/446) use the method below for now 
 
 ## Chrome/chromium/edge
-
 
 https://feds.farm/blog/posts/yamato2-0/#what-s-the-deal-with-chrome-chromium-and-edge
 
