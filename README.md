@@ -1,6 +1,6 @@
 # Yamato
 [![rating](https://img.shields.io/amo/rating/yamato-blocker?label=Firefox)](https://addons.mozilla.org/en-US/firefox/addon/yamato-blocker/) 
-[![license](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/zeroarchroot/yamato/blob/main/LICENSE) 
+[![license](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/fedsfarm/yamato/blob/main/LICENSE) 
 
 ![Demo](demo/demo.gif)
 
@@ -30,7 +30,7 @@ Homepage: [yamato.feds.farm](https://yamato.feds.farm)
 
 https://feds.farm/blog/posts/yamato2-0/#what-s-the-deal-with-chrome-chromium-and-edge
 
-1. Download and unpack the latest version https://github.com/zeroarchroot/yamato/releases/
+1. Download and unpack the latest version https://github.com/fedsfarm/yamato/releases/
 2. Browse to chrome://extensions/ and press enable the developer mode (top-right corner)
 3. Load unpacked -> select the location with an unpacked .zip
 
