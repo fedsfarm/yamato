@@ -13,10 +13,10 @@ document.addEventListener('DOMContentLoaded', () => {
         window.open('https://addons.mozilla.org/en-US/firefox/addon/yamato-blocker/', '_blank');
       }
       else if (button.textContent === 'Source code') {
-        window.open('https://github.com/zeroarchroot/yamato', '_blank');
+        window.open('https://github.com/fedsfarm/yamato', '_blank');
       }
       else if (button.textContent === 'Credits') {
-        window.open('https://github.com/zeroarchroot/yamato#credits', '_blank');
+        window.open('https://github.com/fedsfarm/yamato#credits', '_blank');
       }
     });
   });
