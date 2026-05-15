@@ -58,29 +58,24 @@ If you want to contribute feel free to open a pull request
 
 ### Videos
 
-Vergil status by [@terikuruzu5424](https://www.youtube.com/@terikuruzu5424)
-
-Dante status by [@lambiticousroofius2680](https://www.youtube.com/@lambiticousroofius2680)
-
-Secret status by [@othertin](https://www.youtube.com/@othertin)
-
-Nero status by [@GenAlphaPro](https://www.youtube.com/@GenAlphaPro)
-
-Ranks by [@thescarletphoenix7894](https://www.youtube.com/@thescarletphoenix7894)
+- Vergil status by [@terikuruzu5424](https://www.youtube.com/@terikuruzu5424)
+- Dante status by [@lambiticousroofius2680](https://www.youtube.com/@lambiticousroofius2680)
+- Secret status by [@othertin](https://www.youtube.com/@othertin)
+- Nero status by [@GenAlphaPro](https://www.youtube.com/@GenAlphaPro)
+- Ranks by [@thescarletphoenix7894](https://www.youtube.com/@thescarletphoenix7894)
 
 ### Music
 
-https://www.youtube.com/watch?v=jozqnG_32i0
-https://www.youtube.com/watch?v=pvy9km7g6fw
-https://www.youtube.com/watch?v=xti_6Bzpa8A
-https://www.youtube.com/watch?v=eICijnr1k_I
+- https://youtu.be/jozqnG_32i0
+- https://youtu.be/pvy9km7g6fw
+- https://youtu.be/xti_6Bzpa8A
+- https://youtu.be/eICijnr1k_I
 
 ### Misc
 
-Blocklist:
-[Bon-Appetit/porn-domains](https://github.com/Bon-Appetit/porn-domains)
+- Blocklist: [Bon-Appetit/porn-domains](https://github.com/Bon-Appetit/porn-domains)
 
-All backgrounds are from my bottomless directory, contact me if you're an author
+- All backgrounds are from my bottomless directory, contact me if you're an author
 
 ### Any issues?
 
