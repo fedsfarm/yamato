@@ -6,7 +6,7 @@ const modes = {
   vergil: { name: 'Vergil', backgroundImage: 'vergil.png', video: 'vergil.webm', sound: 'vergil.mp3', jceSound: 'vergil_jce.mp3', cursorImage: 'vergil.png', primaryColor: '#DDA0DD', secondaryColor: '#87CEEB', glowColor: 'rgba(221, 160, 221, 0.6)', index: 0 },
   dante: { name: 'Dante', backgroundImage: 'dante.jpg', video: 'dante.webm', sound: 'dante.mp3', jceSound: 'dante_jce.mp3', cursorImage: 'dante.jpg', primaryColor: '#FF0000', secondaryColor: '#FFA500', glowColor: 'rgba(255, 0, 0, 0.6)', index: 1 },
   nero: { name: 'Nero', backgroundImage: 'nero.jpg', video: 'nero.webm', sound: 'nero.mp3', jceSound: 'nero_jce.mp3', cursorImage: 'nero.jpg', primaryColor: '#2E8B57', secondaryColor: '#FFD700', glowColor: 'rgba(46, 139, 87, 0.6)', index: 2 },
-  dante_retro: { name: 'Dante Retro', backgroundImage: 'dante_retro.jpg', video: 'dante_retro_smaller.webm', sound: 'dante_retro.mp3', jceSound: 'dante_retro_jce.mp3', cursorImage: 'dante_retro.jpg', primaryColor: '#FFD700', secondaryColor: '#FFA500', glowColor: 'rgba(255, 215, 0, 0.7)', index: 0 }
+  dante_retro: { name: 'Dante Retro', backgroundImage: 'dante_retro.jpg', video: 'dante_retro.webm', sound: 'dante_retro.mp3', jceSound: 'dante_retro_jce.mp3', cursorImage: 'dante_retro.jpg', primaryColor: '#FFD700', secondaryColor: '#FFA500', glowColor: 'rgba(255, 215, 0, 0.7)', index: 0 }
 };
 
 // Streak rank definitions
@@ -31,7 +31,10 @@ function getEffectiveMode(modeKey, danteRetro) {
 }
 
 function normalizeDomain(input) {
-  input = input.trim().toLowerCase();
+  input = input.trim();
+  // FIX 4: regex entries (prefixed with ~) are stored as-is, lowercased only
+  if (input.startsWith('~')) return input.toLowerCase();
+  input = input.toLowerCase();
   input = input.replace(/^https?:\/\//, '');
   const parts = input.split('/');
   const domain = parts[0];
@@ -43,25 +46,36 @@ function normalizeDomain(input) {
 function isBlocked(hostname, pathname, blocks, exceptions) {
   hostname = hostname.toLowerCase();
   pathname = pathname.toLowerCase();
-  for (const exc of exceptions) {
-    if (exc.includes('/')) {
-      const parts = exc.split('/');
-      const d = parts[0];
-      const p = '/' + parts.slice(1).join('/');
-      if (hostname === d && pathname.startsWith(p)) return false;
+  // FIX 3: strip www. from incoming hostname so it matches stored normalized entries
+  const hostNoWww = hostname.startsWith('www.') ? hostname.substring(4) : hostname;
+
+  // Helper: does a stored entry (domain only, or domain+path) match this request?
+  function entryMatches(entry, matchHost, matchPath) {
+    if (entry.includes('/')) {
+      const slash = entry.indexOf('/');
+      const d = entry.substring(0, slash);
+      const p = entry.substring(slash); // already starts with /
+      // Also support regex entries (prefix ~)
+      if (d === matchHost || matchHost.endsWith('.' + d)) {
+        return matchPath.startsWith(p);
+      }
+      return false;
     } else {
-      if (hostname === exc || hostname.endsWith('.' + exc)) return false;
+      return matchHost === entry || matchHost.endsWith('.' + entry);
     }
   }
+
+  for (const exc of exceptions) {
+    if (exc.startsWith('~')) {
+      // FIX 4: regex exception
+      try { if (new RegExp(exc.substring(1)).test(hostname + pathname)) return false; } catch (_) {}
+    } else if (entryMatches(exc, hostNoWww, pathname)) return false;
+  }
   for (const blk of blocks) {
-    if (blk.includes('/')) {
-      const parts = blk.split('/');
-      const d = parts[0];
-      const p = '/' + parts.slice(1).join('/');
-      if (hostname === d && pathname.startsWith(p)) return true;
-    } else {
-      if (hostname === blk || hostname.endsWith('.' + blk)) return true;
-    }
+    if (blk.startsWith('~')) {
+      // FIX 4: regex block
+      try { if (new RegExp(blk.substring(1)).test(hostname + pathname)) return true; } catch (_) {}
+    } else if (entryMatches(blk, hostNoWww, pathname)) return true;
   }
   return false;
 }
@@ -70,6 +84,9 @@ let danteRetro = false;
 let domains = new Set();
 let exceptions = new Set();
 let currentMode = 'vergil';
+
+// FIX 3: JCE flood guard — true while JCE sounds are playing, blocks re-entry
+let jcePlaying = false;
 
 // Double-sound guard: tracks tabs where run.js is being injected by us
 // so that when run.js calls playSoundInBackground, we let it through once.
@@ -120,7 +137,11 @@ const closingTabs = new Set();
           const hostname = url.hostname.toLowerCase();
           const pathname = url.pathname.toLowerCase();
           const blocked = isBlocked(hostname, pathname, domains, exceptions);
-          if (blocked) browser.scripting.executeScript({ target: { tabId: tab.id }, files: ['run.js'] }).catch(console.error);
+          if (blocked) browser.scripting.executeScript({ target: { tabId: tab.id }, files: ['run.js'] }).catch(e => {
+            const m = (e && e.message) || String(e);
+            if (/Missing host permission|Cannot access a chrome:\/\/|Receiving end does not exist/i.test(m)) { playSound('error.mp3'); browser.runtime.sendMessage({ action: 'protectedTab' }).catch(() => {}); }
+            else console.error(e);
+          });
         } catch (err) { console.error(err); }
       }
     }
@@ -140,12 +161,12 @@ const closingTabs = new Set();
 browser.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === 'install') {
     const now = Date.now();
-    await browser.storage.local.set({ streakInstallTime: now, streakSeenRank: 'D', streakUnlockAll: false });
+    await browser.storage.local.set({ streakInstallTime: now, streakSeenRank: '', streakUnlockAll: false }); // FIX 2: empty sentinel so D.webm plays on first open
     browser.tabs.create({ url: browser.runtime.getURL('pages/install.html') });
   } else if (details.reason === 'update') {
     const res = await browser.storage.local.get(['streakInstallTime']);
     if (!res.streakInstallTime) {
-      await browser.storage.local.set({ streakInstallTime: Date.now(), streakSeenRank: 'D', streakUnlockAll: false });
+      await browser.storage.local.set({ streakInstallTime: Date.now(), streakSeenRank: '', streakUnlockAll: false }); // FIX 2
     }
     browser.tabs.create({ url: browser.runtime.getURL('pages/update.html') });
   }
@@ -311,16 +332,36 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.fromPopup) pendingJceTabs.add(tab.id);
           await browser.scripting.executeScript({ target: { tabId: tab.id }, files: ['run.js'] });
           if (msg.force) {
-            await browser.tabs.sendMessage(tab.id, { action: 'forceBlock' }).catch(console.error);
+            // FIX 3: swallow "Receiving end does not exist" — run.js may not be ready yet;
+            // forceBlock is best-effort since run.js also listens for it on its own load.
+            await browser.tabs.sendMessage(tab.id, { action: 'forceBlock' }).catch(() => {});
           }
-          // For JCE from popup: play jceSound here directly so run.js doesn't need to
-          if (msg.fromPopup) {
+          // FIX 5+3: For JCE from popup — play both jceSound AND the regular sound simultaneously,
+          // but only if not already playing (flood guard).
+          if (msg.fromPopup && !jcePlaying) {
+            jcePlaying = true;
             const effectiveMode = getEffectiveMode(currentMode, danteRetro);
-            await playSound(modes[effectiveMode].jceSound || modes[effectiveMode].sound);
+            const m = modes[effectiveMode];
+            playSound(m.jceSound || m.sound);
+            playSound(m.sound);
+            // Reset flag after a safe window (longest jce sound is ~4s)
+            setTimeout(() => { jcePlaying = false; }, 4000);
           }
           success = true;
         }
-      } catch (e) { console.error('Execute run error:', e); }
+      } catch (e) {
+        // FIX 6: Protected/privileged tabs (chrome://, about:, extensions, etc.) throw
+        // permission errors. Play error.mp3 and swallow the error gracefully.
+        const msg = (e && e.message) || String(e);
+        const isPermission = /Missing host permission|Cannot access a chrome:\/\/|Could not establish connection|Receiving end does not exist/i.test(msg);
+        if (isPermission) {
+          console.warn('Tab is protected, playing error sound:', msg);
+          playSound('error.mp3');
+          browser.runtime.sendMessage({ action: 'protectedTab' }).catch(() => {});
+        } else {
+          console.error('Execute run error:', e);
+        }
+      }
       sendResponse({ success });
     })();
     return true;
@@ -409,21 +450,22 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'getStreak') {
     (async () => {
       try {
-        let res = await browser.storage.local.get(['streakInstallTime', 'streakSeenRank', 'streakUnlockAll', 'streakLongestStreak']);
+        let res = await browser.storage.local.get(['streakInstallTime', 'streakSeenRank', 'streakUnlockAll', 'streakLongestStreak', 'streakUnlockedModes']);
         if (!res.streakInstallTime) {
           const now = Date.now();
-          await browser.storage.local.set({ streakInstallTime: now, streakSeenRank: 'D', streakUnlockAll: false, streakLongestStreak: 0 });
-          res = { streakInstallTime: now, streakSeenRank: 'D', streakUnlockAll: false, streakLongestStreak: 0 };
+          await browser.storage.local.set({ streakInstallTime: now, streakSeenRank: '', streakUnlockAll: false, streakLongestStreak: 0 }); // FIX 2
+          res = { streakInstallTime: now, streakSeenRank: '', streakUnlockAll: false, streakLongestStreak: 0 };
         }
         const days = Math.floor((Date.now() - res.streakInstallTime) / 86400000);
         const currentRank = getRankForDays(days);
-        const seenRank = res.streakSeenRank || 'D';
+        const seenRank = res.streakSeenRank ?? ''; // FIX 2: ?? not || so empty string isn't overridden
         const unlockAll = res.streakUnlockAll || false;
         const longestStreak = Math.max(days, res.streakLongestStreak || 0);
         const isNewRank = currentRank.id !== seenRank;
-        sendResponse({ days, currentRank, seenRank, isNewRank, unlockAll, longestStreak, ranks: RANKS });
+        const unlockedModes = res.streakUnlockedModes || [];
+        sendResponse({ days, currentRank, seenRank, isNewRank, unlockAll, longestStreak, ranks: RANKS, unlockedModes });
       } catch (e) {
-        sendResponse({ days: 0, currentRank: RANKS[0], seenRank: 'D', isNewRank: false, unlockAll: false, longestStreak: 0, ranks: RANKS });
+        sendResponse({ days: 0, currentRank: RANKS[0], seenRank: '', isNewRank: true, unlockAll: false, longestStreak: 0, ranks: RANKS }); // FIX 2
       }
     })();
     return true;
@@ -453,16 +495,31 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'resetStreak') {
     (async () => {
       try {
-        const { streakInstallTime, streakLongestStreak } = await browser.storage.local.get(['streakInstallTime', 'streakLongestStreak']);
-        const currentDays = Math.floor((Date.now() - (streakInstallTime || Date.now())) / 86400000);
-        const longest = Math.max(currentDays, streakLongestStreak || 0);
-        
-        await browser.storage.local.set({ 
+        const res = await browser.storage.local.get(['streakInstallTime', 'streakLongestStreak', 'streakUnlockAll', 'streakUnlockedModes']);
+        const currentDays = Math.floor((Date.now() - (res.streakInstallTime || Date.now())) / 86400000);
+        const longest = Math.max(currentDays, res.streakLongestStreak || 0);
+
+        // FIX 2: Ratchet — collect all modes unlocked before the reset and preserve them.
+        const RATCHET_RANK_ORDER = ['D','C','B','A','S','SS','SSS'];
+        const RATCHET_MODE_UNLOCK = { vergil: null, dante: 'S', nero: 'SS', dante_retro: 'SSS' };
+        const ratchetRankIdx = id => RATCHET_RANK_ORDER.indexOf(id);
+        const prevRank = getRankForDays(currentDays);
+        const prevUnlocked = new Set(res.streakUnlockedModes || []);
+        if (res.streakUnlockAll) {
+          Object.keys(RATCHET_MODE_UNLOCK).forEach(k => prevUnlocked.add(k));
+        } else {
+          Object.entries(RATCHET_MODE_UNLOCK).forEach(([k, req]) => {
+            if (!req || ratchetRankIdx(prevRank.id) >= ratchetRankIdx(req)) prevUnlocked.add(k);
+          });
+        }
+
+        await browser.storage.local.set({
           streakInstallTime: Date.now(),
-          streakSeenRank: 'D', 
-          streakUnlockAll: false,
+          streakSeenRank: '', // FIX 2: empty sentinel so D.webm plays after reset
+          streakUnlockAll: res.streakUnlockAll || false,
           streakLastReset: Date.now(),
-          streakLongestStreak: longest
+          streakLongestStreak: longest,
+          streakUnlockedModes: Array.from(prevUnlocked),
         });
         sendResponse({ success: true });
       } catch (e) { sendResponse({ success: false }); }
@@ -516,7 +573,7 @@ browser.commands.onCommand.addListener((command) => {
     browser.tabs.query({ active: true, currentWindow: true }).then(tabs => {
       if (tabs[0]) {
         browser.scripting.executeScript({ target: { tabId: tabs[0].id }, files: ['run.js'] })
-          .then(() => browser.tabs.sendMessage(tabs[0].id, { action: 'forceBlock' }).catch(console.error))
+          .then(() => browser.tabs.sendMessage(tabs[0].id, { action: 'forceBlock' }).catch(() => {})) // FIX 3
           .catch(console.error);
       }
     }).catch(console.error);
@@ -552,7 +609,11 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
             browser.runtime.sendMessage({ action: 'blockCountUpdated' }).catch(() => {});
           });
         });
-        browser.scripting.executeScript({ target: { tabId }, files: ['run.js'] }).catch(console.error);
+        browser.scripting.executeScript({ target: { tabId }, files: ['run.js'] }).catch(e => {
+          const m = (e && e.message) || String(e);
+          if (/Missing host permission|Cannot access a chrome:\/\/|Receiving end does not exist/i.test(m)) { playSound('error.mp3'); browser.runtime.sendMessage({ action: 'protectedTab' }).catch(() => {}); }
+          else console.error(e);
+        });
       }
     } catch (err) { console.error(err); }
   }

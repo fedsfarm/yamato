@@ -16,7 +16,7 @@
     }
     @font-face {
       font-family: 'DMC';
-      src: url('public/fonts/dmc.woff2') format('truetype');
+      src: url('public/fonts/dmc.woff2') format('woff2');
       font-weight: 700;
       font-display: block;
     }
@@ -26,7 +26,9 @@
     html {
       width: 360px;
       overflow: hidden;
-      font-size: 15px;
+      font-size: 16px;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
     }
 
     :root {
@@ -217,6 +219,14 @@
       opacity: 1;
       text-decoration: underline;
       text-underline-offset: 2px;
+    }
+    .title-link {
+      color: inherit;
+      text-decoration: none;
+    }
+    .title-link:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
     }
     #titleLeft {
       display: flex;
@@ -495,13 +505,39 @@
       transition: color 0.15s;
     }
     li:last-child { border-bottom: none; }
-    .remove-btn {
-      color: rgba(200,60,60,0.35);
-      cursor: pointer; font-weight: bold;
-      background: none; border: none; padding: 0 0 0 8px;
-      transition: color 0.2s; font-size: 1em;
+    li.editing { background: rgba(255,255,255,0.03); }
+    .inline-edit {
+      flex: 1; min-width: 0;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--c-accent);
+      color: var(--c-text);
+      font-family: 'Cinzel', serif;
+      font-size: 1em;
+      letter-spacing: 0.02em;
+      padding: 0 4px 1px;
+      outline: none;
+      box-shadow: 0 2px 6px var(--c-accent-dim);
     }
-    .remove-btn:hover { color: #FF4444; }
+    .remove-btn, .edit-btn {
+      color: var(--c-label);
+      opacity: 0.6;
+      cursor: pointer;
+      background: none; border: none;
+      padding: 2px 7px;
+      transition: opacity 0.2s, color 0.2s;
+      font-size: 1.1em;
+    }
+    .remove-btn { font-weight: bold; }
+    .remove-btn:hover, .edit-btn:hover {
+      color: var(--c-accent);
+      opacity: 1;
+    }
+    .item-actions {
+      display: flex;
+      align-items: center;
+      margin-right: 6px;
+    }
 
     .execute-wrap { padding: 8px 16px 14px; }
     #executeBtn {
@@ -628,6 +664,28 @@
 
     ::-webkit-scrollbar { width: 2px; }
     ::-webkit-scrollbar-thumb { background: var(--c-glass-edge); }
+
+    /* FIX 4: regex helper button */
+    .regex-btn {
+      padding: 5px 7px;
+      background: rgba(255,255,255,0.03);
+      color: var(--c-muted);
+      border: 1px solid rgba(255,255,255,0.06);
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 0.68em;
+      letter-spacing: 0;
+      transition: all 0.2s;
+      white-space: nowrap;
+      border-radius: 2px;
+      flex-shrink: 0;
+      title: 'Insert regex for current domain';
+    }
+    .regex-btn:hover {
+      color: var(--c-accent);
+      border-color: var(--c-glass-edge);
+      background: var(--c-accent-dim);
+    }
   </style>
 </head>
 <body data-char="vergil">
@@ -641,7 +699,7 @@
     <!-- Header -->
     <div class="hdr">
       <div>
-        <div class="hdr-title">Yamato 2.0</div>
+        <div class="hdr-title"><a href="https://github.com/fedsfarm/yamato" target="_blank" class="title-link">Yamato 2.1</a></div>
         <div class="hdr-sub"><a href="https://feds.farm" target="_blank">by feds.farm</a></div>
       </div>
       <div id="titleLeft"></div>
@@ -691,6 +749,7 @@
     </div>
     <div class="input-row">
       <input type="text" id="customUrl" placeholder="e.g., example.com">
+      <button class="regex-btn" id="regexBlockBtn" title="Insert regex pattern for current domain">.*</button>
       <button class="dmc-btn" id="addBtn">Add</button>
     </div>
     <ul id="customList"></ul>
@@ -706,6 +765,7 @@
     </div>
     <div class="input-row">
       <input type="text" id="exceptionUrl" placeholder="e.g., allowed.com">
+      <button class="regex-btn" id="regexExcBtn" title="Insert regex pattern for current domain">.*</button>
       <button class="dmc-btn" id="addExcBtn">Add</button>
     </div>
     <ul id="exceptionsList"></ul>
