@@ -6,7 +6,7 @@
 
 Prevents you from being unmotivated
 
-Latest update: [feds.farm/posts/yamato2-0/](https://feds.farm/blog/posts/yamato2-0/)
+Latest update: [feds.farm/posts/yamato2-1/](https://feds.farm/blog/posts/yamato2-1/)
 
 Homepage: [yamato.feds.farm](https://yamato.feds.farm) 
 
