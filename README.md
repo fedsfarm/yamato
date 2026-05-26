@@ -16,7 +16,7 @@ Homepage: [yamato.feds.farm](https://yamato.feds.farm)
 
 # Warning
 
-~~Glowies want you to watch porn~~ some browsers may block media autoplaying. The 2.0 version slightly hacks that principle, but make sure it isn't blocked if a video/audio doesn't play.
+~~Glowies want you to watch porn~~ some browsers may block media autoplaying. Make sure it isn't blocked if a video/audio doesn't play.
 
 ## Firefox and forks
 

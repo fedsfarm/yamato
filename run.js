@@ -74,27 +74,67 @@ if (typeof browser === 'undefined') {
     video.playsInline = true;
     video.volume = 1;
     Object.assign(video.style, { width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' });
-    video.play().catch(console.error);
+    video.play().catch(() => {});
 
-    // Chrome throttles background tabs and can freeze video playback when the
-    // tab loses focus. Two complementary fixes:
-    //
-    // 1. Web Locks API: holding a lock prevents Chrome from fully suspending
-    //    the page's task queue, keeping timers and media alive.
-    // 2. visibilitychange: re-call play() when the tab becomes visible again
-    //    in case Chrome paused the video while hidden.
+    // Tabs opened in the background (e.g. Ctrl+click) may not render video frames
+    // even for muted media. Chrome accepts play() (paused=false) but doesn't decode.
+    // Drop the paused check — always re-call play() when the tab becomes visible so
+    // it works whether Chrome kept paused=true (blocked) or paused=false (accepted
+    // but throttled without rendering).
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && !video.ended) {
+        video.play().catch(() => {});
+      }
+    });
+
+    // Web Locks API: holding a lock prevents Chrome from fully suspending
+    // the page's task queue — this also keeps setInterval firing at full rate
+    // in background tabs (Chrome's intensive throttling exempts pages with locks).
     if (navigator.locks?.request) {
       navigator.locks.request('efxt-video-keep-alive', { mode: 'exclusive' }, () => {
-        // Return a promise that never resolves — holds the lock for the tab's lifetime.
         return new Promise(() => {});
       });
     }
 
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        video.play().catch(console.error);
-      }
+    // Chrome background tab defense — two layers:
+    // 1. React to explicit pause events (Chrome fires these via background video
+    //    track optimization when it decides to throttle the video element).
+    // 2. Poll currentTime every 500ms to detect silent track suspension — Chrome
+    //    can freeze the video track without firing 'pause', leaving video.paused=false
+    //    but currentTime stuck. play() on a non-paused element is a no-op, so we
+    //    call pause() to trigger the pause listener, which then calls play().
+    //    Special case: if stuck within the last 0.5s, treat as ended and close
+    //    the tab — Chrome can silently freeze the final frame forever, preventing
+    //    the 'ended' event from ever firing.
+    video.addEventListener('pause', () => {
+      if (!video.ended) video.play().catch(() => {});
     });
+
+    let _lastVideoTime = -1;
+    const _videoStuckInterval = setInterval(() => {
+      if (video.ended) { clearInterval(_videoStuckInterval); return; }
+      const cur = video.currentTime;
+      if (!video.paused && cur === _lastVideoTime && cur >= 0) {
+        if (video.duration > 0 && cur >= video.duration - 0.5) {
+          // Stuck on the final frame — Chrome won't advance past it in background.
+          // Close the tab as if the video ended normally.
+          clearInterval(_videoStuckInterval);
+          (browser.runtime.sendMessage || chrome.runtime.sendMessage)({ action: 'close-this-tab' });
+        } else {
+          // Stuck mid-video: force a pause so the pause listener can call play().
+          video.pause();
+        }
+      }
+      _lastVideoTime = cur;
+    }, 500);
+    video.addEventListener('ended', () => clearInterval(_videoStuckInterval), { once: true });
+    video.addEventListener('error', () => clearInterval(_videoStuckInterval), { once: true });
+
+    // Signal to Chrome's media session that playback is active — reduces
+    // the chance of the browser treating this as a stalled/idle media session.
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'playing';
+    }
 
     // Listen for video end event to close the tab
     video.addEventListener('ended', () => {
@@ -262,14 +302,40 @@ if (typeof browser === 'undefined') {
   }
 
 
-  const url = new URL(window.location.href);
-  const hostname = url.hostname.toLowerCase();
-  const pathname = url.pathname.toLowerCase();
+  // Check if the current URL is blocked and activate if so.
+  function checkAndBlock() {
+    const url = new URL(window.location.href);
+    const hostname = url.hostname.toLowerCase();
+    const pathname = url.pathname.toLowerCase();
+    browser.runtime.sendMessage({ action: 'isBlocked', hostname, pathname }, (response) => {
+      if (chrome.runtime.lastError || !response || !response.isBlocked) return;
+      initBlock();
+    });
+  }
 
-  browser.runtime.sendMessage({ action: 'isBlocked', hostname: hostname, pathname: pathname }, (response) => {
-    if (chrome.runtime.lastError || !response || !response.isBlocked) return;
-    initBlock();
-  });
+  checkAndBlock();
+
+  // FIX 1: SPA navigation — intercept history.pushState / replaceState so that
+  // in-page route changes (YouTube Shorts, Reddit, Twitter, etc.) are also checked.
+  // We patch at the IIFE level so the patch persists for the lifetime of the document,
+  // even though run.js may only be injected once (sessionStorage guard prevents re-init).
+  (function patchHistory() {
+    function onUrlChange() {
+      // Only re-check; initBlock() is idempotent (isBlockingActive guard).
+      if (!isBlockingActive) checkAndBlock();
+    }
+    const origPush    = history.pushState.bind(history);
+    const origReplace = history.replaceState.bind(history);
+    history.pushState = function(...args) {
+      origPush(...args);
+      onUrlChange();
+    };
+    history.replaceState = function(...args) {
+      origReplace(...args);
+      onUrlChange();
+    };
+    window.addEventListener('popstate', onUrlChange);
+  })();
 
   (browser.runtime.onMessage || chrome.runtime.onMessage).addListener((msg, sender, sendResponse) => {
     if (msg?.action === 'forceBlock') {

@@ -233,6 +233,8 @@ function rankIdx(id) { return RANK_ORDER.indexOf(id); }
 function isModeUnlocked(key, data) {
   if (!data) return key === 'vergil';
   if (data.unlockAll) return true;
+  // FIX 2: check ratchet — modes unlocked before a streak reset stay unlocked
+  if (data.unlockedModes && data.unlockedModes.includes(key)) return true;
   const req = MODE_UNLOCK[key];
   return !req || rankIdx(data.currentRank.id) >= rankIdx(req);
 }
@@ -282,9 +284,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       vid.src = browser.runtime.getURL('public/ranks/' + rank.id + '.webm');
       vid.autoplay = true; vid.muted = false; vid.playsInline = true;
       vid.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;cursor:pointer;';
-      const done = () => { showImg(rank); browser.runtime.sendMessage({ action:'markStreakSeen' }); };
+      const done = () => { showImg(rank); };
       vid.addEventListener('ended', done); vid.addEventListener('error', done);
       vid.addEventListener('click', () => { playClick(); openChudPopup(); });
+      // FIX 2: mark as seen immediately when the video begins — not only on 'ended'.
+      // This ensures closing the popup early (before the video finishes) doesn't
+      // cause the rank video to replay on the next popup open. PNG shows on re-open.
+      browser.runtime.sendMessage({ action:'markStreakSeen' });
       el.appendChild(vid);
     } else { showImg(rank); }
   }
@@ -485,9 +491,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  function buildItem(domain, removeAction) {
+  function buildItem(domain, removeAction, addAction) {
     const li = document.createElement('li');
     const sp = document.createElement('span'); sp.textContent = domain;
+    const actions = document.createElement('span'); actions.className = 'item-actions';
+
+    function startEdit() {
+      if (li.classList.contains('editing')) return;
+      li.classList.add('editing');
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.value = domain; inp.className = 'inline-edit';
+      li.replaceChild(inp, sp);
+      inp.focus(); inp.select();
+
+      function commit() {
+        const newVal = inp.value.trim().toLowerCase();
+        if (!newVal || newVal === domain) { cancel(); return; }
+        browser.runtime.sendMessage({ action: removeAction, domain }, () => {
+          browser.runtime.sendMessage({ action: addAction, domain: newVal }, r => {
+            if (r?.success) { loadLists(); renderStats(); }
+          });
+        });
+      }
+      function cancel() {
+        li.classList.remove('editing');
+        li.replaceChild(sp, inp);
+      }
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+        if (e.key === 'Escape') cancel();
+      });
+      inp.addEventListener('blur', cancel);
+    }
+
+    const ed = document.createElement('span'); ed.textContent = '✎'; ed.className = 'edit-btn';
+    ed.onclick = () => { playClick(); startEdit(); };
+    li.addEventListener('dblclick', () => { playClick(); startEdit(); });
+
     const rm = document.createElement('span'); rm.textContent = '✕'; rm.className = 'remove-btn';
     rm.onclick = () => {
       playClick();
@@ -495,7 +535,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (r?.success) { loadLists(); renderStats(); }
       });
     };
-    li.appendChild(sp); li.appendChild(rm);
+    actions.appendChild(ed); actions.appendChild(rm);
+    li.appendChild(sp); li.appendChild(actions);
     return li;
   }
 
@@ -505,12 +546,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       const cl = document.getElementById('customList');
       if (cl) {
         cl.innerHTML = '';
-        (res.customBlocks || []).forEach(d => cl.appendChild(buildItem(d, 'removeCustomBlock')));
+        (res.customBlocks || []).forEach(d => cl.appendChild(buildItem(d, 'removeCustomBlock', 'addCustomBlock')));
       }
       const el = document.getElementById('exceptionsList');
       if (el) {
         el.innerHTML = '';
-        (res.customExceptions || []).forEach(d => el.appendChild(buildItem(d, 'removeException')));
+        (res.customExceptions || []).forEach(d => el.appendChild(buildItem(d, 'removeException', 'addException')));
       }
       const blocked = document.getElementById('statBlocked');
       if (blocked) blocked.textContent = res.totalBlockCount || 0;
@@ -533,7 +574,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function openInfoPopup() {
     const ov = mkOverlay(), box = mkBox();
-    const t = document.createElement('div'); t.className = 'popup-title'; t.textContent = 'What form of power is this?'; box.appendChild(t);
+    const t = document.createElement('div'); t.className = 'popup-title'; t.textContent = 'Release fucking DMC6 already'; box.appendChild(t);
     const tbl = document.createElement('table'); tbl.className = 'popup-table';
     [['S','7d','Dante'],['SS','14d','Nero'],['SSS','21d','???']].forEach(([rank,days,lbl]) => {
       const tr = document.createElement('tr');
@@ -548,8 +589,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     hotkeyLabel.style.cssText = 'margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.05);font-size:0.64em;color:var(--c-text);line-height:1.65;letter-spacing:0.03em;';
     hotkeyLabel.innerHTML = '<strong>Pro tip:</strong> press Ctrl+Shift+U to kill current tab';
     box.appendChild(hotkeyLabel);
-    
-    const tag = document.createElement('span'); tag.className = 'popup-tagline'; tag.textContent = "Degeneracy shall not pass"; box.appendChild(tag);
+
+    const linkRow = document.createElement('div');
+    linkRow.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.05);';
+    [
+      ['Donate',      'https://feds.farm/#donate'],
+      ['Matrix chat', 'https://escape.feds.farm#main:feds.farm'],
+      ['Rate',        'https://addons.mozilla.org/en-US/firefox/addon/yamato-blocker/'],
+      ['Source code', 'https://github.com/fedsfarm/yamato']
+    ].forEach(([label, url]) => {
+      const b = document.createElement('button');
+      b.className = 'dmc-btn';
+      b.textContent = label;
+      b.style.cssText = 'font-size:0.56em;padding:4px 8px;border-radius:15px;background:transparent;border-color:rgba(255,255,255,0.1);color:var(--c-muted);letter-spacing:0.08em;width:100%;';
+      b.addEventListener('mouseover', () => { b.style.borderColor = 'var(--c-glass-edge)'; b.style.color = 'var(--c-accent)'; });
+      b.addEventListener('mouseout',  () => { b.style.borderColor = 'rgba(255,255,255,0.1)'; b.style.color = 'var(--c-muted)'; });
+      b.addEventListener('click', () => { playClick(); window.open(url, '_blank'); });
+      linkRow.appendChild(b);
+    });
+    box.appendChild(linkRow);
+
+    const tag = document.createElement('span'); tag.className = 'popup-tagline'; tag.style.marginTop = '12px'; tag.textContent = "Degeneracy shall not pass"; box.appendChild(tag);
+
     const row = document.createElement('div'); row.className = 'popup-btn-row';
     const closeBtn = mkBtn('Got it');
     closeBtn.addEventListener('click', () => { playClick(); document.body.removeChild(ov); });
@@ -669,8 +730,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const execBtn = document.getElementById('executeBtn');
   if (execBtn) {
+    let jceBusy = false;
     execBtn.addEventListener('click', () => {
-      browser.runtime.sendMessage({ action:'executeRun', force:true, fromPopup:true });
+      // FIX 3: prevent sound flood — ignore clicks while a JCE is already in flight
+      if (jceBusy) return;
+      jceBusy = true;
+      execBtn.style.opacity = '0.45';
+      execBtn.style.pointerEvents = 'none';
+      browser.runtime.sendMessage({ action:'executeRun', force:true, fromPopup:true }, () => {
+        // Re-enable after background acknowledges (fires after sounds have started)
+        setTimeout(() => {
+          jceBusy = false;
+          execBtn.style.opacity = '';
+          execBtn.style.pointerEvents = '';
+        }, 1200); // rough max of jce intro before it's safe to allow again
+      });
     });
   }
 
@@ -692,6 +766,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // FIX 4: regex helper buttons — clicking inserts a ~regex pattern for the current domain
+  function makeRegexForDomain(url) {
+    try {
+      const u = new URL(url);
+      const host = u.hostname.replace(/^www\./, '');
+      // Escapes dots, produces: ~(^|\.)youtube\.com($|/)
+      const escaped = host.replace(/\./g, '\\.');
+      return '~(^|\\.)' + escaped + '($|/)';
+    } catch { return ''; }
+  }
+
+  const regexBlockBtn = document.getElementById('regexBlockBtn');
+  const regexExcBtn   = document.getElementById('regexExcBtn');
+  if (regexBlockBtn) {
+    regexBlockBtn.addEventListener('click', () => {
+      browser.tabs.query({ active:true, currentWindow:true }, tabs => {
+        if (tabs?.[0]) {
+          const rx = makeRegexForDomain(tabs[0].url);
+          if (rx && customUrl) { customUrl.value = rx; customUrl.focus(); }
+        }
+      });
+    });
+  }
+  if (regexExcBtn) {
+    regexExcBtn.addEventListener('click', () => {
+      browser.tabs.query({ active:true, currentWindow:true }, tabs => {
+        if (tabs?.[0]) {
+          const rx = makeRegexForDomain(tabs[0].url);
+          if (rx && excUrl) { excUrl.value = rx; excUrl.focus(); }
+        }
+      });
+    });
+  }
+
   await loadMode();
   // FIX 4: load streak first, then render stats — streakData is guaranteed set before renderStats()
   streakData = await loadStreak();
@@ -703,10 +811,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadEnableStates();
   preloadDomain();
 
+  function openProtectedTabPopup() {
+    const ov = mkOverlay(), box = mkBox();
+    const t = document.createElement('div'); t.className = 'popup-title'; t.textContent = 'Foolishness, Dante. FOOLISHNESS'; box.appendChild(t);
+    const p = document.createElement('div'); p.className = 'popup-body'; p.textContent = 'This tab is protected by browser, probably'; box.appendChild(p);
+    const row = document.createElement('div'); row.className = 'popup-btn-row';
+    const btn = mkBtn('Oh shit');
+    btn.addEventListener('click', () => { playClick(); document.body.removeChild(ov); });
+    row.appendChild(btn); box.appendChild(row);
+    ov.addEventListener('click', e => { if (e.target === ov) document.body.removeChild(ov); });
+    ov.appendChild(box); document.body.appendChild(ov);
+  }
+
   // Listen for block count updates from content scripts
   (browser.runtime.onMessage || chrome.runtime.onMessage).addListener((msg) => {
     if (msg?.action === 'blockCountUpdated') {
       loadLists();
+    }
+    if (msg?.action === 'protectedTab') {
+      openProtectedTabPopup();
     }
   });
 

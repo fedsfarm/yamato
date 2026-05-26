@@ -6,7 +6,6 @@
     --radius: 12px;
     font-family: 'Courier New', Courier, monospace;
 }
-ks
 * {
     box-sizing: border-box;
     margin: 0;
@@ -19,6 +18,8 @@ body {
     overflow-x: hidden;
     font-size: 16px;
     color: var(--green);
+    -webkit-text-size-adjust: none;
+    text-size-adjust: none;
 }
 
 body {
