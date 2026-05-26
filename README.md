@@ -36,8 +36,6 @@ https://feds.farm/blog/posts/yamato2-0/#what-s-the-deal-with-chrome-chromium-and
 
 Since the auto updates aren't working you can subscribe to my blog https://feds.farm/blog/ and manage them manually
 
-Consider switching to firefox, though
-
 ## Android / IOS
 
 It should work on Firefox Mobile and forks
