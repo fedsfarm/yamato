@@ -22,10 +22,6 @@ Homepage: [yamato.feds.farm](https://yamato.feds.farm)
 
 [Download from Firefox ADD-ONS](https://addons.mozilla.org/en-US/firefox/addon/yamato-blocker/)
 
-## Opera
-
-[Well, well, well...](https://forums.opera.com/topic/16609/very-long-extension-moderation-process/446) use the method below for now 
-
 ## Chrome/chromium/edge
 
 https://feds.farm/blog/posts/yamato2-0/#what-s-the-deal-with-chrome-chromium-and-edge
@@ -35,6 +31,10 @@ https://feds.farm/blog/posts/yamato2-0/#what-s-the-deal-with-chrome-chromium-and
 3. Load unpacked -> select the location with an unpacked .zip
 
 Since the auto updates aren't working you can subscribe to my blog https://feds.farm/blog/ and manage them manually
+
+## Opera
+
+[Well, well, well...](https://forums.opera.com/topic/16609/very-long-extension-moderation-process/446) use the method for chrome
 
 ## Android / IOS
 
