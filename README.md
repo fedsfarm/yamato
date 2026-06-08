@@ -87,4 +87,5 @@ BTC: bc1p2xkwf9elq8wgajtq2cc6zthuh4k998tgnk6365cnjqgal7mpd09q4jtfq8
 
 XMR: 42uxSBp4aMyTAsPCMGEwHvJyGpemr1c7kdjtFsD5tnEsU7XsnYMjseyXBzLWHkruSWFGbQWagsh31bBRdU7vDNUBAzm1Mo4
 
-DM me if you need a different method or something else
+P.S big thanks for the anonymous donations
+DM me if you want to see yourself here
