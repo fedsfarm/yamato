@@ -79,14 +79,8 @@ If you want to contribute feel free to open a pull request
 
 Contact [root@feds.farm](mailto:root@feds.farm)
 
-I'm not monetizing this, but...
-
-## You always can buy me some pizza
+## Donate
 
 BTC: bc1p2xkwf9elq8wgajtq2cc6zthuh4k998tgnk6365cnjqgal7mpd09q4jtfq8
-
 XMR: 42uxSBp4aMyTAsPCMGEwHvJyGpemr1c7kdjtFsD5tnEsU7XsnYMjseyXBzLWHkruSWFGbQWagsh31bBRdU7vDNUBAzm1Mo4
-
-P.S big thanks for the anonymous donations
-
-DM me if you want to see yourself here
+ETH: 0xBD636eBD3a6b9F046930101657459E90DA370e81
