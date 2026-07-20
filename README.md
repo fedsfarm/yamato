@@ -1,6 +1,6 @@
 # Yamato
 [![rating](https://img.shields.io/amo/rating/yamato-blocker?label=Firefox)](https://addons.mozilla.org/en-US/firefox/addon/yamato-blocker/) 
-[![license](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/fedsfarm/yamato/blob/main/LICENSE) 
+[![license](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/fedsfarm/gloview/blob/main/LICENSE) [![Matrix](https://img.shields.io/badge/Matrix-Join%20chat-green?logo=matrix&logoColor=white)](https://escape.feds.farm/#main:feds.farm) [![Donate](https://img.shields.io/badge/Donate-XMR%20%C2%B7%20BTC%20%C2%B7%20ETH-orange?logo=monero&logoColor=white&labelColor=555)](#donate)
 
 ![Demo](demo/demo.gif)
 
@@ -81,9 +81,15 @@ Contact [root@feds.farm](mailto:root@feds.farm)
 
 ## Donate
 
-#### BTC:
-`bc1p2xkwf9elq8wgajtq2cc6zthuh4k998tgnk6365cnjqgal7mpd09q4jtfq8`  
-#### ETH:
-`0xBD636eBD3a6b9F046930101657459E90DA370e81`  
 #### XMR:
-`42uxSBp4aMyTAsPCMGEwHvJyGpemr1c7kdjtFsD5tnEsU7XsnYMjseyXBzLWHkruSWFGbQWagsh31bBRdU7vDNUBAzm1Mo4`  
+`42uxSBp4aMyTAsPCMGEwHvJyGpemr1c7kdjtFsD5tnEsU7XsnYMjseyXBzLWHkruSWFGbQWagsh31bBRdU7vDNUBAzm1Mo4`
+
+#### BTC:
+`bc1p2xkwf9elq8wgajtq2cc6zthuh4k998tgnk6365cnjqgal7mpd09q4jtfq8`
+
+#### ETH (ERC-20):
+`0xBD636eBD3a6b9F046930101657459E90DA370e81`
+
+---
+
+Email [root@feds.farm](mailto:root@feds.farm) or DM [@root:feds.farm](https://escape.feds.farm/#@root:feds.farm) on Matrix if you want your donation to be visible
