@@ -12,8 +12,6 @@ Homepage: [yamato.feds.farm](https://yamato.feds.farm)
 
 [#stopciaporn](https://feds.farm)
 
-[![#main:feds.farm](https://escape.feds.farm/feds.png)](https://escape.feds.farm/#main:feds.farm) 
-
 # Warning
 
 ~~Glowies want you to watch porn~~ some browsers may block media autoplaying. Make sure it isn't blocked if a video/audio doesn't play.
