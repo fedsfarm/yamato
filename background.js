@@ -2,6 +2,305 @@ if (typeof browser === 'undefined') {
   var browser = chrome;
 }
 
+if (typeof importScripts === 'function') importScripts('site-modules.js');
+
+// Shared by Firefox's background page and Chrome's service worker.
+globalThis.createListLock = function (storage, now = Date.now) {
+  const durations = [1 / 24, 1, 3, 7, 14, 30];
+  const mutations = new Set([
+    'addCustomBlock', 'removeCustomBlock', 'addException', 'removeException',
+    'editCustomBlock', 'editException',
+    'setEnableCustomBlocks', 'setEnableCustomExceptions',
+  ]);
+  const actions = new Set(['getListLock', 'prepareListLock', 'confirmListLock', 'cancelListLock']);
+  let queue = Promise.resolve();
+
+  return function route(msg, sendResponse, next) {
+    if (!msg || msg.target === 'offscreen') return false;
+    if (!mutations.has(msg.action) && !actions.has(msg.action)) return false;
+    // Finish earlier list writes before locking; later writes must see the lock.
+    queue = queue.then(async () => {
+      const state = await storage.get(['listLockedUntil', 'listLockPending']);
+      const lockedUntil = Number(state.listLockedUntil) || 0;
+      if (msg.action === 'getListLock') return { success: true, lockedUntil };
+      if (lockedUntil > now()) {
+        return { success: false, lockedUntil, error: 'Custom / Exceptions are locked until ' + new Date(lockedUntil).toLocaleString() + '.' };
+      }
+      if (msg.action === 'prepareListLock') {
+        const days = msg.days ?? 7;
+        let duration;
+        if (msg.durationMinutes !== undefined) {
+          if (!Number.isSafeInteger(msg.durationMinutes) || msg.durationMinutes < 1 || msg.durationMinutes > 525600) {
+            return { success: false, error: 'Choose a duration from 1 minute to 365 days, in whole minutes.' };
+          }
+          duration = msg.durationMinutes * 60000;
+        } else {
+          if (!durations.includes(days)) return { success: false, error: 'Choose a valid lock duration.' };
+          duration = days * 86400000;
+        }
+        const pending = { readyAt: now() + 10000, duration, token: crypto.randomUUID() };
+        await storage.set({ listLockPending: pending });
+        return { success: true, ...pending };
+      }
+      if (msg.action === 'cancelListLock') {
+        if (state.listLockPending?.token === msg.token) await storage.remove('listLockPending');
+        return { success: true };
+      }
+      if (msg.action === 'confirmListLock') {
+        const pending = state.listLockPending;
+        if (!pending || pending.token !== msg.token || now() < pending.readyAt || now() > pending.readyAt + 600000) {
+          return { success: false, error: 'Open the warning again and wait ten seconds before confirming.' };
+        }
+        const until = now() + pending.duration;
+        await storage.set({ listLockedUntil: until });
+        await storage.remove('listLockPending');
+        return { success: true, lockedUntil: until };
+      }
+      return await new Promise(resolve => next(msg, resolve));
+    }).then(sendResponse).catch(error => {
+      console.error('List lock request failed:', error);
+      sendResponse({ success: false, error: 'Could not save settings. Please try again.' });
+    });
+    return true;
+  };
+};
+
+// Static domain rules and saved overrides.
+globalThis.mediaBlocking = (() => {
+  const api = typeof browser === 'undefined' ? chrome : browser;
+  const resourceTypes = ['image', 'media', 'sub_frame', 'object'];
+  let baseDomains = new Set();
+  let customRules = [];
+  let pageOnlyRules = [];
+  let queue = Promise.resolve();
+
+  function conditionFor(entry) {
+    entry = normalizeDomain(entry);
+    if (entry.startsWith('~')) {
+      // Convert host/path regexes to full URL patterns.
+      let regexFilter = '';
+      let inClass = false;
+      const pattern = entry.slice(1);
+      for (let i = 0; i < pattern.length; i++) {
+        const char = pattern[i];
+        if (char === '\\') { regexFilter += char + (pattern[++i] || ''); continue; }
+        if (char === '[') inClass = true;
+        if (char === ']') inClass = false;
+        regexFilter += !inClass && char === '^' ? '^https?://'
+          : !inClass && char === '$' ? '(?:[?#].*)?$' : char;
+      }
+      return { resourceTypes, regexFilter, isUrlFilterCaseSensitive: false };
+    }
+    const slash = entry.indexOf('/');
+    const domain = slash < 0 ? entry : entry.slice(0, slash);
+    const hostname = new URL('https://' + domain).hostname;
+    if (slash < 0) return { resourceTypes, requestDomains: [hostname] };
+    const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return {
+      resourceTypes,
+      requestDomains: [hostname],
+      regexFilter: '^https?://[^/]+/' + escape(entry.slice(slash + 1)),
+      isUrlFilterCaseSensitive: false,
+    };
+  }
+
+  function sync(changes) {
+    const update = queue.catch(() => {}).then(async () => {
+      const stored = await api.storage.local.get([
+        'customBlocks', 'customExceptions', 'enableCustomBlocks', 'enableCustomExceptions',
+      ]);
+      const next = { ...stored, ...changes };
+      const rules = [];
+      const pageOnly = [];
+      for (const [key, enabled, priority, action] of [
+        ['customBlocks', next.enableCustomBlocks !== false, 2,
+          { type: 'redirect', redirect: { extensionPath: '/public/assets/jc.webm' } }],
+        ['customExceptions', next.enableCustomExceptions !== false, 3, { type: 'allow' }],
+      ]) {
+        for (const entry of next[key] || []) {
+          // Legacy JS regexes still work for navigation, even when DNR cannot use them.
+          if (entry.startsWith('~')) {
+            try { new RegExp(entry.slice(1)); }
+            catch { throw new Error('Invalid regular expression: ' + entry); }
+          }
+          const condition = conditionFor(entry);
+          if (condition.regexFilter) {
+            const result = await api.declarativeNetRequest.isRegexSupported({
+              regex: condition.regexFilter, isCaseSensitive: false,
+            });
+            if (!result.isSupported) {
+              if (!(stored[key] || []).includes(entry)) throw new Error('This pattern is not supported for media blocking. Use a simpler regex.');
+              pageOnly.push(entry);
+              continue;
+            }
+          }
+          if (!enabled) continue;
+          if (action.type === 'redirect') rules.push(...yamatoJC.rules(condition, priority, rules.length + 1));
+          else rules.push({ id: rules.length + 1, priority, action, condition });
+        }
+      }
+      const previous = await api.declarativeNetRequest.getDynamicRules();
+      await api.declarativeNetRequest.updateDynamicRules({
+        removeRuleIds: previous.map(rule => rule.id), addRules: rules,
+      });
+      if (changes) {
+        try { await api.storage.local.set(changes); }
+        catch (error) {
+          await api.declarativeNetRequest.updateDynamicRules({
+            removeRuleIds: rules.map(rule => rule.id), addRules: previous,
+          });
+          throw error;
+        }
+      }
+      customRules = rules.sort((a, b) => b.priority - a.priority).map(rule => ({
+        ...rule, regex: rule.condition.regexFilter ? new RegExp(rule.condition.regexFilter, 'i') : null,
+      }));
+      pageOnlyRules = pageOnly;
+      if (changes) {
+        api.tabs.query({}).then(tabs => {
+          for (const tab of tabs) {
+            api.tabs.sendMessage(tab.id, { action: 'mediaRulesChanged' }).catch(() => {});
+          }
+        }).catch(() => {});
+      }
+    });
+    queue = update;
+    return update;
+  }
+
+  const ready = (async () => {
+    // Read exactly the canonical domains used by the browser's static rules.
+    const resources = api.runtime.getManifest().declarative_net_request.rule_resources;
+    const groups = await Promise.all(resources.filter(resource => resource.id.startsWith('blocked_media')).map(async resource => {
+      const response = await fetch(api.runtime.getURL(resource.path));
+      if (!response.ok) throw new Error('Failed to load media rules');
+      return response.json();
+    }));
+    baseDomains = new Set(groups.flat().flatMap(rule => rule.condition.requestDomains));
+    await sync().catch(error => console.error('Failed to synchronize custom media rules:', error));
+  })();
+  ready.catch(error => console.error('Media blocking initialization failed:', error));
+
+  function blocked(rawUrl) {
+    let url;
+    try { url = new URL(rawUrl); } catch { return false; }
+    if (!['http:', 'https:'].includes(url.protocol)) return false;
+    for (const rule of customRules) {
+      const { requestDomains } = rule.condition;
+      if (requestDomains && !requestDomains.some(domain => url.hostname === domain || url.hostname.endsWith('.' + domain))) continue;
+      if (rule.regex && !rule.regex.test(url.href)) continue;
+      return rule.action.type === 'redirect';
+    }
+    let host = url.hostname.replace(/^www\./, '');
+    let bundled = false;
+    while (host) {
+      if (baseDomains.has(host)) { bundled = true; break; }
+      const dot = host.indexOf('.');
+      if (dot < 0) break;
+      host = host.slice(dot + 1);
+    }
+    return bundled;
+  }
+
+  let settingsQueue = Promise.resolve();
+  function syncSetting(moduleId, mode) {
+    const update = settingsQueue.catch(() => {}).then(async () => {
+      const { siteModules = {}, enableSiteModules } = await api.storage.local.get(['siteModules', 'enableSiteModules']);
+      const updated = enableSiteModules === false
+        ? Object.fromEntries(yamatoSites.definitions.map(site => [site.id, 'off']))
+        : { ...siteModules };
+      updated[moduleId] = mode;
+      await api.storage.local.set({ siteModules: updated, enableSiteModules: true });
+    });
+    settingsQueue = update;
+    return update;
+  }
+  function syncAllSettings(mode) {
+    const update = settingsQueue.catch(() => {}).then(async () => {
+      const { siteModules = {} } = await api.storage.local.get('siteModules');
+      const updated = { ...siteModules };
+      for (const site of yamatoSites.definitions) updated[site.id] = mode;
+      await api.storage.local.set({ siteModules: updated, enableSiteModules: true });
+    });
+    settingsQueue = update;
+    return update;
+  }
+  return { ready, sync, blocked, syncSetting, syncAllSettings,
+    bundled: domain => baseDomains.has(domain),
+    get pageOnlyRules() { return pageOnlyRules; },
+  };
+})();
+
+// Redirect flagged search media per tab.
+globalThis.searchMedia = (() => {
+  const api = typeof browser === 'undefined' ? chrome : browser;
+  const firstId = 100000;
+  let queue = Promise.resolve();
+  const serialize = operation => {
+    const result = queue.catch(() => {}).then(operation);
+    queue = result;
+    return result;
+  };
+  const sessionRules = async () => (await api.declarativeNetRequest.getSessionRules()).filter(rule => rule.id >= firstId);
+  function sync() {
+    return serialize(async () => {
+      const settings = yamatoSites.settings(await api.storage.local.get(['siteModules', 'enableSiteModules']));
+      const rules = await sessionRules();
+      await api.declarativeNetRequest.updateSessionRules({ removeRuleIds: rules.filter(rule => {
+        const site = yamatoSites.forHost(rule.condition.initiatorDomains?.[0] || '');
+        return rule.action.type !== 'redirect' || !settings.enableSiteModules || !site || settings.siteModules[site.id] === 'off';
+      }).map(rule => rule.id) });
+    });
+  }
+  function clear(tabId) {
+    return serialize(async () => {
+      const rules = await sessionRules();
+      await api.declarativeNetRequest.updateSessionRules({
+        removeRuleIds: rules.filter(rule => tabId === undefined || rule.condition.tabIds.includes(tabId)).map(rule => rule.id),
+      });
+    });
+  }
+  function block(sender, urls) {
+    return serialize(async () => {
+      const site = yamatoSites.forHost(new URL(sender.url).hostname);
+      if (!site?.search || !(sender.tab?.id >= 0)) throw new Error('Not a search document');
+      const settings = yamatoSites.settings(await api.storage.local.get(['siteModules', 'enableSiteModules']));
+      if (!settings.enableSiteModules || settings.siteModules[site.id] === 'off') return;
+      const rules = await sessionRules();
+      const existing = new Set(rules.filter(rule => rule.condition.tabIds.includes(sender.tab.id))
+        .map(rule => rule.condition.urlFilter));
+      let id = Math.max(firstId - 1, ...rules.map(rule => rule.id));
+      const addRules = [];
+      for (const raw of new Set(urls)) {
+        const url = new URL(raw);
+        if (!['http:', 'https:'].includes(url.protocol) || /[|*^]/.test(url.href)) continue;
+        const urlFilter = '|' + url.href + '|';
+        if (existing.has(urlFilter)) continue;
+        existing.add(urlFilter);
+        const added = yamatoJC.rules({urlFilter, isUrlFilterCaseSensitive: true,
+          tabIds: [sender.tab.id], initiatorDomains: site.hosts,
+          resourceTypes: ['image', 'media', 'sub_frame', 'object'],
+        }, 10, id + 1);
+        id += added.length;
+        addRules.push(...added);
+      }
+      if (rules.length + addRules.length > 4500) throw new Error('Media redirect limit reached');
+      if (addRules.length) await api.declarativeNetRequest.updateSessionRules({ addRules });
+    });
+  }
+  api.webNavigation.onBeforeNavigate.addListener(details => {
+    if (details.frameId === 0) clear(details.tabId).catch(console.error);
+  });
+  api.tabs.onRemoved.addListener(tabId => clear(tabId).catch(console.error));
+  api.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    if (changes.siteModules || changes.enableSiteModules) sync().catch(console.error);
+    if (changes.customBlocks || changes.customExceptions || changes.enableCustomBlocks || changes.enableCustomExceptions) clear().catch(console.error);
+  });
+  sync().catch(console.error);
+  return { block, sync };
+})();
+
 const modes = {
   vergil: { name: 'Vergil', backgroundImage: 'vergil.png', video: 'vergil.webm', sound: 'vergil.mp3', jceSound: 'vergil_jce.mp3', cursorImage: 'vergil.png', primaryColor: '#DDA0DD', secondaryColor: '#87CEEB', glowColor: 'rgba(221, 160, 221, 0.6)', index: 0 },
   dante: { name: 'Dante', backgroundImage: 'dante.jpg', video: 'dante.webm', sound: 'dante.mp3', jceSound: 'dante_jce.mp3', cursorImage: 'dante.jpg', primaryColor: '#FF0000', secondaryColor: '#FFA500', glowColor: 'rgba(255, 0, 0, 0.6)', index: 1 },
@@ -32,7 +331,7 @@ function getEffectiveMode(modeKey, danteRetro) {
 
 function normalizeDomain(input) {
   input = input.trim();
-  // FIX 4: regex entries (prefixed with ~) are stored as-is, lowercased only
+  // regex entries (prefixed with ~) are stored as-is, lowercased only
   if (input.startsWith('~')) return input.toLowerCase();
   input = input.toLowerCase();
   input = input.replace(/^https?:\/\//, '');
@@ -46,7 +345,7 @@ function normalizeDomain(input) {
 function isBlocked(hostname, pathname, blocks, exceptions) {
   hostname = hostname.toLowerCase();
   pathname = pathname.toLowerCase();
-  // FIX 3: strip www. from incoming hostname so it matches stored normalized entries
+  // strip www. from incoming hostname so it matches stored normalized entries
   const hostNoWww = hostname.startsWith('www.') ? hostname.substring(4) : hostname;
 
   // Helper: does a stored entry (domain only, or domain+path) match this request?
@@ -67,13 +366,13 @@ function isBlocked(hostname, pathname, blocks, exceptions) {
 
   for (const exc of exceptions) {
     if (exc.startsWith('~')) {
-      // FIX 4: regex exception
+      // regex exception
       try { if (new RegExp(exc.substring(1)).test(hostname + pathname)) return false; } catch (_) {}
     } else if (entryMatches(exc, hostNoWww, pathname)) return false;
   }
   for (const blk of blocks) {
     if (blk.startsWith('~')) {
-      // FIX 4: regex block
+      // regex block
       try { if (new RegExp(blk.substring(1)).test(hostname + pathname)) return true; } catch (_) {}
     } else if (entryMatches(blk, hostNoWww, pathname)) return true;
   }
@@ -85,26 +384,20 @@ let domains = new Set();
 let exceptions = new Set();
 let currentMode = 'vergil';
 
-// FIX 3: JCE flood guard — true while JCE sounds are playing, blocks re-entry
+// JCE flood guard — true while JCE sounds are playing, blocks re-entry
 let jcePlaying = false;
+let creatingAudioDocument;
 
-// Double-sound guard: tracks tabs where run.js is being injected by us
-// so that when run.js calls playSoundInBackground, we let it through once.
-// For JCE (fromPopup), we directly play jceSound and tell run.js not to re-play.
+// Allow one sound per injected effect.
 const pendingJceTabs = new Set();
 
-// Redirect guard: tracks tabs that have already had run.js injected for the
-// current navigation. onUpdated fires 'loading' for every hop in a redirect
-// chain, so without this we'd inject (and play sound) once per redirect.
-// Cleared when the tab reaches 'complete' or is removed.
+// Inject once per navigation; clear after completion.
 const activeBlockedTabs = new Set();
 
-// Tracks tabs where the block overlay/video is currently active.
-// Any navigation attempt on these tabs should be cancelled and the tab closed.
+// Close tabs that navigate during an effect.
 const playingTabs = new Set();
 
-// Tracks tabs that have been sentenced to close (Chrome MV3 only).
-// Prevents run.js re-injecting on the redirected page from resurrecting the tab.
+// Do not revive tabs already closing.
 const closingTabs = new Set();
 
 (async () => {
@@ -149,11 +442,7 @@ const closingTabs = new Set();
 
   if (chrome.offscreen) {
     try {
-      const hasDoc = await chrome.offscreen.hasDocument();
-      if (!hasDoc) {
-        await chrome.offscreen.createDocument({ url: 'offscreen.html', reasons: ['AUDIO_PLAYBACK'], justification: 'Play Vergil motivation sound in background' });
-        await new Promise(r => setTimeout(r, 500));
-      }
+      await ensureAudioDocument();
     } catch (e) { console.error('Failed to initialize offscreen document:', e); }
   }
 })();
@@ -161,12 +450,12 @@ const closingTabs = new Set();
 browser.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === 'install') {
     const now = Date.now();
-    await browser.storage.local.set({ streakInstallTime: now, streakSeenRank: '', streakUnlockAll: false }); // FIX 2: empty sentinel so D.webm plays on first open
+    await browser.storage.local.set({ streakInstallTime: now, streakSeenRank: '', streakUnlockAll: false }); // Play D on first open.
     browser.tabs.create({ url: browser.runtime.getURL('pages/install.html') });
   } else if (details.reason === 'update') {
     const res = await browser.storage.local.get(['streakInstallTime']);
     if (!res.streakInstallTime) {
-      await browser.storage.local.set({ streakInstallTime: Date.now(), streakSeenRank: '', streakUnlockAll: false }); // FIX 2
+      await browser.storage.local.set({ streakInstallTime: Date.now(), streakSeenRank: '', streakUnlockAll: false });
     }
     browser.tabs.create({ url: browser.runtime.getURL('pages/update.html') });
   }
@@ -174,23 +463,142 @@ browser.runtime.onInstalled.addListener(async (details) => {
 
 browser.runtime.setUninstallURL("https://feds.farm/bye.html");
 
-// Helper: play sound via offscreen or direct
-async function playSound(soundFile) {
+// Share creation when several visible replacements request sound together.
+async function ensureAudioDocument() {
+  if (!creatingAudioDocument) {
+    creatingAudioDocument = (async () => {
+      if (!await chrome.offscreen.hasDocument()) {
+        await chrome.offscreen.createDocument({
+          url: 'offscreen.html', reasons: ['AUDIO_PLAYBACK'], justification: 'Play blocking effect sounds',
+        });
+      }
+    })().finally(() => { creatingAudioDocument = undefined; });
+  }
+  await creatingAudioDocument;
+}
+
+// Helper: play sound via offscreen or the Firefox background document.
+async function playSound(soundFile, assetPath = 'public/sounds/' + soundFile) {
   if (chrome.offscreen) {
-    const hasDoc = await chrome.offscreen.hasDocument();
-    if (!hasDoc) {
-      await chrome.offscreen.createDocument({ url: 'offscreen.html', reasons: ['AUDIO_PLAYBACK'], justification: 'Play sound' });
-      await new Promise(r => setTimeout(r, 500));
-    }
-    chrome.runtime.sendMessage({ action: 'playSound', sound: soundFile });
+    await ensureAudioDocument();
+    return chrome.runtime.sendMessage({ action: 'playSound', target: 'offscreen', assetPath });
   } else {
-    const audio = new Audio(browser.runtime.getURL('public/sounds/' + soundFile));
-    audio.play().catch(console.error);
+    if (assetPath === yamatoJC.sound.slice(1)) return yamatoJCAudio.play(browser.runtime.getURL(assetPath));
+    const audio = new Audio(browser.runtime.getURL(assetPath));
+    await audio.play();
+    return { started: true };
   }
 }
 
+// All automatic full-page effects target the reporting tab, never the active tab.
+const mediaPageTabs = new Set();
+async function blockMediaPage(tabId) {
+  if (mediaPageTabs.has(tabId) || playingTabs.has(tabId) || closingTabs.has(tabId)) return;
+  mediaPageTabs.add(tabId);
+  pendingJceTabs.add(tabId);
+  try {
+    await browser.scripting.executeScript({ target: { tabId }, files: ['run.js'] });
+    const result = await browser.tabs.sendMessage(tabId, { action: 'forceBlock' }, { frameId: 0 });
+    if (!result?.success) throw new Error(result?.error || 'Slice overlay did not start');
+    const mode = modes[getEffectiveMode(currentMode, danteRetro)];
+    playSound(mode.jceSound || mode.sound);
+    playSound(mode.sound);
+  } catch (error) {
+    mediaPageTabs.delete(tabId);
+    pendingJceTabs.delete(tabId);
+    throw error;
+  }
+}
+
+const routeListLock = createListLock(browser.storage.local);
 browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (routeListLock(msg, sendResponse, (request, respond) => handleMessage(request, sender, respond))) return true;
+  return handleMessage(msg, sender, sendResponse);
+});
+
+function handleMessage(msg, sender, sendResponse) {
+  if (msg?.target === 'offscreen') return;
   if (!msg?.action) { sendResponse({}); return; }
+
+  if (msg.action === 'playJCSound') {
+    if (!sender.tab) { sendResponse({ started: false }); return; }
+    playSound(null, yamatoJC.sound.slice(1))
+      .then(sendResponse)
+      .catch(error => {
+        console.warn('JC sound failed:', error);
+        sendResponse({ started: false });
+      });
+    return true;
+  }
+
+  if (msg.action === 'getBlockingSettings') {
+    browser.storage.local.get(['siteModules', 'mediaBlockMode', 'enableSiteModules'])
+      .then(value => sendResponse({ success: true, ...yamatoSites.settings(value) }))
+      .catch(() => sendResponse({ success: false }));
+    return true;
+  }
+  if (msg.action === 'setBlockingSetting') {
+    (async () => {
+      try {
+        if (msg.moduleId) {
+          if (!yamatoSites.definitions.some(site => site.id === msg.moduleId) || !['off', 'jc', 'jce'].includes(msg.mode)) throw new Error('Invalid site setting');
+          // Serialize updates so two quick setting changes cannot overwrite one another.
+          await mediaBlocking.syncSetting(msg.moduleId, msg.mode);
+          await searchMedia.sync();
+        } else {
+          if (!['jc', 'jce'].includes(msg.mode)) throw new Error('Invalid media mode');
+          await browser.storage.local.set({ mediaBlockMode: msg.mode });
+        }
+        sendResponse({ success: true });
+      } catch (error) { sendResponse({ success: false, error: error.message }); }
+    })();
+    return true;
+  }
+  if (msg.action === 'setAllSiteModules') {
+    (async () => {
+      try {
+        if (!['off', 'jc', 'jce'].includes(msg.mode)) throw new Error('Invalid site setting');
+        await mediaBlocking.syncAllSettings(msg.mode);
+        await searchMedia.sync();
+        sendResponse({ success: true });
+      } catch (error) { sendResponse({ success: false, error: error.message }); }
+    })();
+    return true;
+  }
+  if (msg.action === 'mediaFullPage' && sender.tab?.id >= 0) {
+    (async () => {
+      try {
+        const settings = yamatoSites.settings(await browser.storage.local.get(['siteModules', 'mediaBlockMode', 'enableSiteModules']));
+        if (msg.moduleId) {
+          const site = yamatoSites.definitions.find(site => site.id === msg.moduleId);
+          const host = new URL(sender.url).hostname;
+          if (!settings.enableSiteModules || !site || settings.siteModules[site.id] !== 'jce' ||
+              (!site.detect && yamatoSites.forHost(host)?.id !== site.id)) throw new Error('Module disabled or wrong site');
+        } else {
+          await mediaBlocking.ready;
+          if (settings.mediaBlockMode !== 'jce' || !Array.isArray(msg.urls) ||
+              !msg.urls.slice(0, 256).some(url => typeof url === 'string' && mediaBlocking.blocked(url))) throw new Error('Media not blocked');
+        }
+        await blockMediaPage(sender.tab.id);
+        sendResponse({ success: true });
+      } catch (error) { sendResponse({ success: false, error: error.message }); }
+    })();
+    return true;
+  }
+
+  if (msg.action === 'checkMediaURLs' && Array.isArray(msg.urls)) {
+    mediaBlocking.ready.then(() => {
+      sendResponse({ blocked: msg.urls.slice(0, 256).filter(url => typeof url === 'string' && mediaBlocking.blocked(url)) });
+    }).catch(() => sendResponse({ error: 'Media policy unavailable' }));
+    return true;
+  }
+
+  if (msg.action === 'blockSearchMedia' && Array.isArray(msg.urls) && msg.urls.length <= 256) {
+    searchMedia.block(sender, msg.urls)
+      .then(() => sendResponse({ success: true }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
 
   if (msg.action === 'isBlocked' && msg.hostname && msg.pathname) {
     const blocked = isBlocked(msg.hostname.toLowerCase(), msg.pathname.toLowerCase(), domains, exceptions);
@@ -201,8 +609,7 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'videoStarted' && sender?.tab?.id) {
     const tabId = sender.tab.id;
     if (closingTabs.has(tabId)) {
-      // Chrome MV3: the tab navigated, re-injected, but we already called
-      // tabs.remove on it. Don't resurect it in playingTabs.
+      // Ignore late messages from closing tabs.
       sendResponse({ success: false });
       return true;
     }
@@ -221,10 +628,12 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'getLists') {
     (async () => {
       try {
+        await mediaBlocking.ready;
         const result = await browser.storage.local.get(['customBlocks', 'customExceptions', 'totalBlockCount']);
         sendResponse({ 
           customBlocks: result.customBlocks || [], 
           customExceptions: result.customExceptions || [],
+          pageOnlyRules: mediaBlocking.pageOnlyRules,
           totalBlockCount: result.totalBlockCount || 0
         });
       } catch (e) { sendResponse({}); }
@@ -232,92 +641,46 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
-  if (msg.action === 'addCustomBlock' && msg.domain) {
+  const listOperation = {
+    addCustomBlock: 'add', removeCustomBlock: 'remove', editCustomBlock: 'edit',
+    addException: 'add', removeException: 'remove', editException: 'edit',
+  }[msg.action];
+  if (listOperation) {
     (async () => {
-      const domain = normalizeDomain(msg.domain);
-      let success = false;
-      if (domain) {
-        try {
-          const result = await browser.storage.local.get(['customBlocks', 'enableCustomBlocks']);
-          const customBlocks = result.customBlocks || [];
-          const enableCustomBlocks = result.enableCustomBlocks !== false;
-          
-          if (!customBlocks.includes(domain)) {
-            customBlocks.push(domain);
-            await browser.storage.local.set({ customBlocks });
-            if (enableCustomBlocks) domains.add(domain);
-            success = true;
-          } else {
-            success = true; // Already exists, still success
-          }
-        } catch (e) { console.error(e); }
-      }
-      sendResponse({ success });
-    })();
-    return true;
-  }
-
-  if (msg.action === 'addException' && msg.domain) {
-    (async () => {
-      const domain = normalizeDomain(msg.domain);
-      let success = false;
-      if (domain) {
-        try {
-          const result = await browser.storage.local.get(['customExceptions', 'enableCustomExceptions']);
-          const customExceptions = result.customExceptions || [];
-          const enableCustomExceptions = result.enableCustomExceptions !== false;
-          
-          if (!customExceptions.includes(domain)) {
-            customExceptions.push(domain);
-            await browser.storage.local.set({ customExceptions });
-            if (enableCustomExceptions) exceptions.add(domain);
-            success = true;
-          } else {
-            success = true;
-          }
-        } catch (e) { console.error(e); }
-      }
-      sendResponse({ success });
-    })();
-    return true;
-  }
-
-  if (msg.action === 'removeCustomBlock' && msg.domain) {
-    (async () => {
-      const domain = normalizeDomain(msg.domain);
-      let success = false;
-      domains.delete(domain);
       try {
-        const result = await browser.storage.local.get(['customBlocks']);
-        const customBlocks = result.customBlocks || [];
-        const idx = customBlocks.indexOf(domain);
-        if (idx > -1) {
-          customBlocks.splice(idx, 1);
-          await browser.storage.local.set({ customBlocks });
-        }
-        success = true;
-      } catch (e) { console.error(e); }
-      sendResponse({ success });
-    })();
-    return true;
-  }
+        await mediaBlocking.ready;
+        if (typeof msg.domain !== 'string') throw new Error('Enter a domain or regex.');
+        const domain = normalizeDomain(msg.domain);
+        if (!domain) throw new Error('Enter a domain or regex.');
+        const isException = msg.action.endsWith('Exception');
+        const key = isException ? 'customExceptions' : 'customBlocks';
+        const enabledKey = isException ? 'enableCustomExceptions' : 'enableCustomBlocks';
+        const stored = await browser.storage.local.get([key, enabledKey]);
+        const previous = stored[key] || [];
+        const updated = [...previous];
+        const index = updated.indexOf(domain);
+        if (listOperation === 'edit') {
+          if (index < 0) throw new Error('This entry changed. Reopen the list and try again.');
+          if (typeof msg.newDomain !== 'string') throw new Error('Enter a replacement domain or regex.');
+          const replacement = normalizeDomain(msg.newDomain);
+          if (!replacement) throw new Error('Enter a replacement domain or regex.');
+          if (replacement !== domain && updated.includes(replacement)) throw new Error('That entry already exists.');
+          updated[index] = replacement;
+        } else if (listOperation === 'add' && index < 0) updated.push(domain);
+        else if (listOperation === 'remove' && index >= 0) updated.splice(index, 1);
 
-  if (msg.action === 'removeException' && msg.domain) {
-    (async () => {
-      const domain = normalizeDomain(msg.domain);
-      let success = false;
-      exceptions.delete(domain);
-      try {
-        const result = await browser.storage.local.get(['customExceptions']);
-        const customExceptions = result.customExceptions || [];
-        const idx = customExceptions.indexOf(domain);
-        if (idx > -1) {
-          customExceptions.splice(idx, 1);
-          await browser.storage.local.set({ customExceptions });
+        // Validate and commit the complete list before changing navigation state.
+        // sync restores the previous network rules if saving storage fails.
+        await mediaBlocking.sync({ [key]: updated });
+        const active = isException ? exceptions : domains;
+        for (const entry of previous) {
+          if (isException || !mediaBlocking.bundled(entry)) active.delete(entry);
         }
-        success = true;
-      } catch (e) { console.error(e); }
-      sendResponse({ success });
+        if (stored[enabledKey] !== false) updated.forEach(entry => active.add(entry));
+        sendResponse({ success: true });
+      } catch (error) {
+        sendResponse({ success: false, error: error.message || 'Could not save the list. Please try again.' });
+      }
     })();
     return true;
   }
@@ -332,12 +695,10 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.fromPopup) pendingJceTabs.add(tab.id);
           await browser.scripting.executeScript({ target: { tabId: tab.id }, files: ['run.js'] });
           if (msg.force) {
-            // FIX 3: swallow "Receiving end does not exist" — run.js may not be ready yet;
-            // forceBlock is best-effort since run.js also listens for it on its own load.
+            // The injected script may not be listening yet.
             await browser.tabs.sendMessage(tab.id, { action: 'forceBlock' }).catch(() => {});
           }
-          // FIX 5+3: For JCE from popup — play both jceSound AND the regular sound simultaneously,
-          // but only if not already playing (flood guard).
+          // Play both sounds once per popup JCE.
           if (msg.fromPopup && !jcePlaying) {
             jcePlaying = true;
             const effectiveMode = getEffectiveMode(currentMode, danteRetro);
@@ -350,8 +711,7 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           success = true;
         }
       } catch (e) {
-        // FIX 6: Protected/privileged tabs (chrome://, about:, extensions, etc.) throw
-        // permission errors. Play error.mp3 and swallow the error gracefully.
+        // Protected tabs get an error sound.
         const msg = (e && e.message) || String(e);
         const isPermission = /Missing host permission|Cannot access a chrome:\/\/|Could not establish connection|Receiving end does not exist/i.test(msg);
         if (isPermission) {
@@ -408,7 +768,7 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'setEnableCustomBlocks' && typeof msg.enabled === 'boolean') {
     (async () => {
       try {
-        await browser.storage.local.set({ enableCustomBlocks: msg.enabled });
+        await mediaBlocking.sync({ enableCustomBlocks: msg.enabled });
         const { customBlocks = [] } = await browser.storage.local.get(['customBlocks']);
         if (msg.enabled) {
           customBlocks.forEach(d => domains.add(d.toLowerCase()));
@@ -435,7 +795,7 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'setEnableCustomExceptions' && typeof msg.enabled === 'boolean') {
     (async () => {
       try {
-        await browser.storage.local.set({ enableCustomExceptions: msg.enabled });
+        await mediaBlocking.sync({ enableCustomExceptions: msg.enabled });
         const { customExceptions = [] } = await browser.storage.local.get(['customExceptions']);
         if (msg.enabled) { customExceptions.forEach(d => exceptions.add(d.toLowerCase())); }
         else { customExceptions.forEach(d => exceptions.delete(d.toLowerCase())); }
@@ -445,7 +805,7 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
-  // ── Streak ────────────────────────────────────────────────────────────────
+  // Streak
 
   if (msg.action === 'getStreak') {
     (async () => {
@@ -453,19 +813,19 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         let res = await browser.storage.local.get(['streakInstallTime', 'streakSeenRank', 'streakUnlockAll', 'streakLongestStreak', 'streakUnlockedModes']);
         if (!res.streakInstallTime) {
           const now = Date.now();
-          await browser.storage.local.set({ streakInstallTime: now, streakSeenRank: '', streakUnlockAll: false, streakLongestStreak: 0 }); // FIX 2
+          await browser.storage.local.set({ streakInstallTime: now, streakSeenRank: '', streakUnlockAll: false, streakLongestStreak: 0 });
           res = { streakInstallTime: now, streakSeenRank: '', streakUnlockAll: false, streakLongestStreak: 0 };
         }
         const days = Math.floor((Date.now() - res.streakInstallTime) / 86400000);
         const currentRank = getRankForDays(days);
-        const seenRank = res.streakSeenRank ?? ''; // FIX 2: ?? not || so empty string isn't overridden
+        const seenRank = res.streakSeenRank ?? '';
         const unlockAll = res.streakUnlockAll || false;
         const longestStreak = Math.max(days, res.streakLongestStreak || 0);
         const isNewRank = currentRank.id !== seenRank;
         const unlockedModes = res.streakUnlockedModes || [];
         sendResponse({ days, currentRank, seenRank, isNewRank, unlockAll, longestStreak, ranks: RANKS, unlockedModes });
       } catch (e) {
-        sendResponse({ days: 0, currentRank: RANKS[0], seenRank: '', isNewRank: true, unlockAll: false, longestStreak: 0, ranks: RANKS }); // FIX 2
+        sendResponse({ days: 0, currentRank: RANKS[0], seenRank: '', isNewRank: true, unlockAll: false, longestStreak: 0, ranks: RANKS });
       }
     })();
     return true;
@@ -499,7 +859,7 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const currentDays = Math.floor((Date.now() - (res.streakInstallTime || Date.now())) / 86400000);
         const longest = Math.max(currentDays, res.streakLongestStreak || 0);
 
-        // FIX 2: Ratchet — collect all modes unlocked before the reset and preserve them.
+        // Ratchet — collect all modes unlocked before the reset and preserve them.
         const RATCHET_RANK_ORDER = ['D','C','B','A','S','SS','SSS'];
         const RATCHET_MODE_UNLOCK = { vergil: null, dante: 'S', nero: 'SS', dante_retro: 'SSS' };
         const ratchetRankIdx = id => RATCHET_RANK_ORDER.indexOf(id);
@@ -515,7 +875,7 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
         await browser.storage.local.set({
           streakInstallTime: Date.now(),
-          streakSeenRank: '', // FIX 2: empty sentinel so D.webm plays after reset
+          streakSeenRank: '', // Replay D after reset.
           streakUnlockAll: res.streakUnlockAll || false,
           streakLastReset: Date.now(),
           streakLongestStreak: longest,
@@ -527,7 +887,7 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
-  // ── Audio ─────────────────────────────────────────────────────────────────
+  // Audio
 
   if (msg.action === 'playSoundInBackground') {
     (async () => {
@@ -538,24 +898,15 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
       }
 
-      let success = false;
       try {
         const effectiveMode = getEffectiveMode(currentMode, danteRetro);
         const soundFile = modes[effectiveMode].sound;
-        if (chrome.offscreen) {
-          const hasDoc = await chrome.offscreen.hasDocument();
-          if (!hasDoc) {
-            await chrome.offscreen.createDocument({ url: 'offscreen.html', reasons: ['AUDIO_PLAYBACK'], justification: 'Play motivation sound' });
-            await new Promise(r => setTimeout(r, 500));
-          }
-          chrome.runtime.sendMessage({ action: 'playSound', sound: soundFile }, res => { if (res?.started) success = true; });
-        } else {
-          const audio = new Audio(browser.runtime.getURL('public/sounds/' + soundFile));
-          audio.play().then(() => { success = true; sendResponse({ success: true }); }).catch(e => { sendResponse({ success: false }); });
-          return true;
-        }
-      } catch (e) { console.error('Sound play error:', e); }
-      sendResponse({ success });
+        const result = await playSound(soundFile);
+        sendResponse({ success: !!result?.started });
+      } catch (e) {
+        console.error('Sound play error:', e);
+        sendResponse({ success: false });
+      }
     })();
     return true;
   }
@@ -566,14 +917,14 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   sendResponse({});
-});
+}
 
 browser.commands.onCommand.addListener((command) => {
   if (command === 'execute-run') {
     browser.tabs.query({ active: true, currentWindow: true }).then(tabs => {
       if (tabs[0]) {
         browser.scripting.executeScript({ target: { tabId: tabs[0].id }, files: ['run.js'] })
-          .then(() => browser.tabs.sendMessage(tabs[0].id, { action: 'forceBlock' }).catch(() => {})) // FIX 3
+          .then(() => browser.tabs.sendMessage(tabs[0].id, { action: 'forceBlock' }).catch(() => {}))
           .catch(console.error);
       }
     }).catch(console.error);
@@ -581,12 +932,9 @@ browser.commands.onCommand.addListener((command) => {
 });
 
 browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  // Only inject once per navigation. We intentionally do NOT reset the guard
-  // on changeInfo.url so that redirect chains don't trigger multiple injections
-  // (and multiple count increments). The guard is cleared on 'complete' or tab removal.
+  // Keep the injection guard through redirects.
   if (changeInfo.status === 'loading') {
-    // If the video is playing in this tab, the webRequest listener handles it.
-    // Don't attempt re-injection; the tab is being closed.
+    // The navigation listener handles playing tabs.
     if (playingTabs.has(tabId)) return;
     if (closingTabs.has(tabId)) return;
     if (activeBlockedTabs.has(tabId)) return;
@@ -601,8 +949,7 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       const blocked = isBlocked(hostname, pathname, domains, exceptions);
       if (blocked) {
         activeBlockedTabs.add(tabId);
-        // Single source of truth for the block count — incremented here,
-        // removed from run.js, so redirects and double-injection can't stack it.
+        // Count once per blocked navigation.
         browser.storage.local.get(['totalBlockCount']).then(result => {
           const count = (result.totalBlockCount || 0) + 1;
           browser.storage.local.set({ totalBlockCount: count }).then(() => {
@@ -618,8 +965,7 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     } catch (err) { console.error(err); }
   }
 
-  // Clear the guard once the tab finishes loading (committed to final URL),
-  // so the next navigation into this tab starts clean.
+  // Allow the next navigation after completion.
   if (changeInfo.status === 'complete') {
     activeBlockedTabs.delete(tabId);
   }
@@ -628,23 +974,12 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 // Also clear if the tab is closed, to avoid a stale entry in the set.
 browser.tabs.onRemoved.addListener((tabId) => {
   activeBlockedTabs.delete(tabId);
+  mediaPageTabs.delete(tabId);
   pendingJceTabs.delete(tabId);
   playingTabs.delete(tabId);
   closingTabs.delete(tabId);
 });
-// Intercept navigations on tabs where the video overlay is active.
-//
-// Strategy differs by browser:
-//
-//   Firefox (MV2) — webRequest with 'blocking' can cancel the navigation
-//                   outright, keeping the document alive so the video plays
-//                   to completion. The video's own 'ended' handler closes
-//                   the tab when done.
-//
-//   Chrome (MV3)  — webRequestBlocking is not permitted for non-enterprise
-//                   extensions. We use webNavigation.onBeforeNavigate which
-//                   fires at the earliest possible moment, then close the tab.
-//                   The video is cut short but the redirect loop is broken.
+// Firefox cancels navigation; Chrome closes the tab.
 
 const isFirefox = typeof browser !== 'undefined' &&
   browser.runtime.getURL('').startsWith('moz-extension://');
@@ -670,3 +1005,13 @@ if (isFirefox && browser.webRequest?.onBeforeRequest) {
     }
   });
 }
+
+// Network rules still stop the original request in either effect mode.
+browser.webRequest.onBeforeRequest.addListener(details => {
+  if (details.tabId < 0) return;
+  mediaBlocking.ready.then(async () => {
+    if (!mediaBlocking.blocked(details.url)) return;
+    const { mediaBlockMode } = await browser.storage.local.get('mediaBlockMode');
+    if (mediaBlockMode === 'jce') await blockMediaPage(details.tabId);
+  }).catch(error => console.warn('Yamato media page block failed:', error));
+}, { urls: ['http://*/*', 'https://*/*'], types: ['image', 'media', 'sub_frame', 'object'] });

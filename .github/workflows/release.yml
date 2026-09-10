@@ -1,0 +1,147 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '[0-9]*'
+      - 'v[0-9]*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to release (e.g. 2.2.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Validate version tag and manifests
+        run: |
+          # shellcheck disable=SC2016
+          deno eval '
+            const tag = Deno.env.get("RELEASE_TAG");
+            if (!/^v?[0-9]+\.[0-9]+\.[0-9]+$/.test(tag)) throw new Error("Expected a stable version tag, e.g. 2.2.0");
+            for (const platform of ["chrome", "firefox"]) {
+              const manifest = JSON.parse(await Deno.readTextFile(`manifest.${platform}.json`));
+              if (manifest.version !== tag.replace(/^v/, "")) throw new Error(`${platform} version does not match ${tag}`);
+              if (platform === "chrome" && manifest.update_url !== `https://github.com/${Deno.env.get("GH_REPO")}/releases/latest/download/updates.xml`) throw new Error("Chrome update URL does not match this repository");
+            }
+          '
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg zip
+          command -v google-chrome
+
+      - name: Build and sign packages
+        env:
+          CRX_PRIVATE_KEY: ${{ secrets.YAMATO_CRX_KEY }}
+          YAMATO_CRX_KEY: ${{ runner.temp }}/yamato-signing.pem
+          CHROMIUM_BIN: google-chrome
+        run: |
+          test -n "$CRX_PRIVATE_KEY" || { echo 'Missing YAMATO_CRX_KEY repository secret'; exit 1; }
+          umask 077
+          trap 'rm -f "$YAMATO_CRX_KEY"' EXIT
+          printf '%s\n' "$CRX_PRIVATE_KEY" > "$YAMATO_CRX_KEY"
+          unset CRX_PRIVATE_KEY
+          export YAMATO_CRX_URL="https://github.com/$GH_REPO/releases/download/$RELEASE_TAG/yamato-chrome.crx"
+          bash scripts/release-chrome.sh
+          bash build.sh firefox
+          cp yamato-firefox.xpi release/
+          (cd release && sha256sum yamato-chrome.crx yamato-chrome.zip yamato-firefox.xpi updates.xml lcjglagcjlajleojohmbcfmjdhbgkadc.json > SHA256SUMS)
+
+      - name: Save build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ inputs.tag || github.ref_name }}
+          path: release/
+          if-no-files-found: error
+
+      - name: Publish complete release
+        run: |
+          if gh release view "$RELEASE_TAG" --json isDraft > "$RUNNER_TEMP/yamato-release.json"; then
+            jq -e '.isDraft == true' "$RUNNER_TEMP/yamato-release.json" > /dev/null || {
+              echo 'This version is already published. Bump both manifests and push a new tag.'
+              exit 1
+            }
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "Yamato $RELEASE_TAG" --generate-notes
+          fi
+          gh release upload "$RELEASE_TAG" release/* --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --latest
+
+  verify:
+    needs: release
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+
+      - name: Verify public GitHub update feed and CRX
+        run: |
+          python3 - <<'PY'
+          import hashlib, io, json, os, struct, subprocess, urllib.parse, xml.etree.ElementTree as ET, zipfile
+
+          def download(url):
+              return subprocess.check_output([
+                  'curl', '--fail', '--silent', '--show-error', '--location',
+                  '--retry', '6', '--retry-all-errors', '--retry-delay', '5',
+                  '--connect-timeout', '15', '--max-time', '120', url,
+              ])
+
+          repository = os.environ['GITHUB_REPOSITORY']
+          tag = os.environ['RELEASE_TAG']
+          version = tag.removeprefix('v')
+          feed = f'https://github.com/{repository}/releases/latest/download/updates.xml'
+          release = f'https://github.com/{repository}/releases/download/{tag}'
+          extension_id = 'lcjglagcjlajleojohmbcfmjdhbgkadc'
+          with open('manifest.chrome.json') as source:
+              manifest = json.load(source)
+          assert manifest['update_url'] == feed, 'Source manifest uses a different feed'
+          # Include Chrome's update query to exercise GitHub redirects as Chrome does.
+          query = urllib.parse.urlencode({'x': f'id={extension_id}&v=0.0.0'})
+          xml = download(feed + '?' + query)
+          app = ET.fromstring(xml).find('{*}app')
+          assert app is not None and app.get('appid') == extension_id, 'Wrong extension ID'
+          update = app.find('{*}updatecheck')
+          assert update is not None and update.get('version') == version, 'Wrong feed version'
+          assert update.get('codebase') == release + '/yamato-chrome.crx', 'Wrong CRX URL'
+          crx = download(update.get('codebase'))
+          checksums = dict(line.split()[::-1] for line in download(release + '/SHA256SUMS').decode().splitlines())
+          for name, data in [('updates.xml', xml), ('yamato-chrome.crx', crx)]:
+              assert hashlib.sha256(data).hexdigest() == checksums[name], f'{name}: checksum mismatch'
+          magic, format_version, header_size = struct.unpack('<4sII', crx[:12])
+          assert magic == b'Cr24' and format_version == 3, 'Expected a CRX3 package'
+          with zipfile.ZipFile(io.BytesIO(crx[12 + header_size:])) as package:
+              assert package.testzip() is None, 'Corrupt CRX ZIP payload'
+              packaged = json.loads(package.read('manifest.json'))
+          assert packaged['version'] == version, 'Wrong packaged version'
+          assert packaged['update_url'] == feed, 'Wrong packaged update URL'
+          print(f'Public update feed and CRX verified: {extension_id}, version {version}')
+          PY

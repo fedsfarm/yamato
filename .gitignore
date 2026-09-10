@@ -6,4 +6,8 @@ dist-firefox
 originals
 dev
 .kilo
-.gitignore
+dist-chrome.pem
+release/
+.playwright-mcp/
+*.crx
+*.pem

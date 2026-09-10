@@ -16,19 +16,24 @@ if (typeof browser === 'undefined') {
     return modes[effective] || modes.vergil;
   };
   if (document.getElementById('efxt-transparent-video-overlay-host')) return;
-  // Secondary guard: sessionStorage persists for the lifetime of the tab's
-  // document. If run.js already initialised in this document (e.g. injected
-  // twice due to a race), bail out immediately.
-  try {
-    if (sessionStorage.getItem('efxt-active') === '1') return;
-    sessionStorage.setItem('efxt-active', '1');
-  } catch (_) { /* private-browsing or sandboxed frame — ignore */ }
+  // Initialize once per document, including after reloads.
+  if (globalThis.yamatoSliceInitialized) return;
+  globalThis.yamatoSliceInitialized = true;
 
   let isBlockingActive = false;
   let mo, pointerEventsListeners, keyEventsListeners;
   let blockEventFunc, blockKeyEventFunc;
 
-  async function initBlock() {
+  let startingBlock;
+  function initBlock() {
+    if (!startingBlock) startingBlock = startBlock().catch(error => {
+      isBlockingActive = false;
+      startingBlock = undefined;
+      throw error;
+    });
+    return startingBlock;
+  }
+  async function startBlock() {
     if (isBlockingActive) return;
     isBlockingActive = true;
     currentModeData = await getCurrentModeData();
@@ -76,36 +81,21 @@ if (typeof browser === 'undefined') {
     Object.assign(video.style, { width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' });
     video.play().catch(() => {});
 
-    // Tabs opened in the background (e.g. Ctrl+click) may not render video frames
-    // even for muted media. Chrome accepts play() (paused=false) but doesn't decode.
-    // Drop the paused check — always re-call play() when the tab becomes visible so
-    // it works whether Chrome kept paused=true (blocked) or paused=false (accepted
-    // but throttled without rendering).
+    // Retry playback when a background tab becomes visible.
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && !video.ended) {
         video.play().catch(() => {});
       }
     });
 
-    // Web Locks API: holding a lock prevents Chrome from fully suspending
-    // the page's task queue — this also keeps setInterval firing at full rate
-    // in background tabs (Chrome's intensive throttling exempts pages with locks).
+    // Hold a lock during playback to limit background throttling.
     if (navigator.locks?.request) {
       navigator.locks.request('efxt-video-keep-alive', { mode: 'exclusive' }, () => {
         return new Promise(() => {});
       });
     }
 
-    // Chrome background tab defense — two layers:
-    // 1. React to explicit pause events (Chrome fires these via background video
-    //    track optimization when it decides to throttle the video element).
-    // 2. Poll currentTime every 500ms to detect silent track suspension — Chrome
-    //    can freeze the video track without firing 'pause', leaving video.paused=false
-    //    but currentTime stuck. play() on a non-paused element is a no-op, so we
-    //    call pause() to trigger the pause listener, which then calls play().
-    //    Special case: if stuck within the last 0.5s, treat as ended and close
-    //    the tab — Chrome can silently freeze the final frame forever, preventing
-    //    the 'ended' event from ever firing.
+    // Resume paused/stalled video; close if stalled on the last frame.
     video.addEventListener('pause', () => {
       if (!video.ended) video.play().catch(() => {});
     });
@@ -116,8 +106,7 @@ if (typeof browser === 'undefined') {
       const cur = video.currentTime;
       if (!video.paused && cur === _lastVideoTime && cur >= 0) {
         if (video.duration > 0 && cur >= video.duration - 0.5) {
-          // Stuck on the final frame — Chrome won't advance past it in background.
-          // Close the tab as if the video ended normally.
+          // Treat a stalled final frame as ended.
           clearInterval(_videoStuckInterval);
           (browser.runtime.sendMessage || chrome.runtime.sendMessage)({ action: 'close-this-tab' });
         } else {
@@ -130,8 +119,7 @@ if (typeof browser === 'undefined') {
     video.addEventListener('ended', () => clearInterval(_videoStuckInterval), { once: true });
     video.addEventListener('error', () => clearInterval(_videoStuckInterval), { once: true });
 
-    // Signal to Chrome's media session that playback is active — reduces
-    // the chance of the browser treating this as a stalled/idle media session.
+    // Keep the media session active during playback.
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = 'playing';
     }
@@ -153,9 +141,7 @@ if (typeof browser === 'undefined') {
     shadow.appendChild(container);
     document.documentElement.appendChild(host);
 
-    // Notify background that the overlay is live in this tab.
-    // Background uses this to cancel any further navigations (redirects,
-    // meta-refresh, JS location changes) and close the tab.
+    // Tell the background to intercept navigation during the effect.
     browser.runtime.sendMessage({ action: 'videoStarted' }, () => {
       if (chrome.runtime.lastError) {
         console.warn('videoStarted message failed:', chrome.runtime.lastError);
@@ -301,7 +287,6 @@ if (typeof browser === 'undefined') {
     }
   }
 
-
   // Check if the current URL is blocked and activate if so.
   function checkAndBlock() {
     const url = new URL(window.location.href);
@@ -315,10 +300,7 @@ if (typeof browser === 'undefined') {
 
   checkAndBlock();
 
-  // FIX 1: SPA navigation — intercept history.pushState / replaceState so that
-  // in-page route changes (YouTube Shorts, Reddit, Twitter, etc.) are also checked.
-  // We patch at the IIFE level so the patch persists for the lifetime of the document,
-  // even though run.js may only be injected once (sessionStorage guard prevents re-init).
+  // Recheck the URL after SPA navigation.
   (function patchHistory() {
     function onUrlChange() {
       // Only re-check; initBlock() is idempotent (isBlockingActive guard).
@@ -339,8 +321,8 @@ if (typeof browser === 'undefined') {
 
   (browser.runtime.onMessage || chrome.runtime.onMessage).addListener((msg, sender, sendResponse) => {
     if (msg?.action === 'forceBlock') {
-      initBlock();
-      sendResponse({ success: true });
+      initBlock().then(() => sendResponse({ success: true }),
+        error => sendResponse({ success: false, error: error.message }));
       return true;
     }
   });

@@ -36,7 +36,7 @@ const THEMES = {
     glowColor:  [220, 140,  30], glowAlpha:  0.28,
     bloomColor: [255, 230, 180],
   },
-  // FIX 2: bg changed from 'dante.jpg' → 'dante_retro.jpg'
+  // bg changed from 'dante.jpg' → 'dante_retro.jpg'
   dante_retro: {
     bg: 'dante_retro.jpg', bgGolden: 'dante_retro2.jpg', bgOpacity: 0.80, bgOpacityGolden: 0.80, subtitle: 'DANTE — RETRO',
     overlay: `
@@ -233,7 +233,7 @@ function rankIdx(id) { return RANK_ORDER.indexOf(id); }
 function isModeUnlocked(key, data) {
   if (!data) return key === 'vergil';
   if (data.unlockAll) return true;
-  // FIX 2: check ratchet — modes unlocked before a streak reset stay unlocked
+  // check ratchet — modes unlocked before a streak reset stay unlocked
   if (data.unlockedModes && data.unlockedModes.includes(key)) return true;
   const req = MODE_UNLOCK[key];
   return !req || rankIdx(data.currentRank.id) >= rankIdx(req);
@@ -287,9 +287,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const done = () => { showImg(rank); };
       vid.addEventListener('ended', done); vid.addEventListener('error', done);
       vid.addEventListener('click', () => { playClick(); openChudPopup(); });
-      // FIX 2: mark as seen immediately when the video begins — not only on 'ended'.
-      // This ensures closing the popup early (before the video finishes) doesn't
-      // cause the rank video to replay on the next popup open. PNG shows on re-open.
+      // Mark seen on playback start, even if the popup closes early.
       browser.runtime.sendMessage({ action:'markStreakSeen' });
       el.appendChild(vid);
     } else { showImg(rank); }
@@ -413,11 +411,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         slot.appendChild(label);
       }
-    } else {
-      const btn = document.createElement('button'); btn.id = 'infoBtn'; btn.textContent = 'ℹ';
-      btn.addEventListener('click', () => { playClick(); openInfoPopup(); });
-      slot.appendChild(btn);
     }
+    const gear = document.createElement('button'); gear.id = 'blockingSettingsBtn'; gear.textContent = '⚙';
+    gear.title = 'Settings'; gear.setAttribute('aria-label', 'Settings');
+    gear.addEventListener('click', () => { playClick(); openBlockingSettings(); });
+    const info = document.createElement('button'); info.id = 'infoBtn'; info.textContent = 'ℹ';
+    info.title = 'Info'; info.setAttribute('aria-label', 'Info');
+    info.addEventListener('click', () => { playClick(); openInfoPopup(); });
+    slot.append(gear, info);
   }
 
   function updateLocks(data) {
@@ -428,7 +429,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (locked && !item.querySelector('.lock-overlay')) {
         const lo = document.createElement('div'); lo.className = 'lock-overlay';
         const li = document.createElement('img'); li.src = browser.runtime.getURL('public/assets/lock.png');
-        // FIX 3: lock icon fills the button height
+        // lock icon fills the button height
         li.style.cssText = 'width:auto;height:100%;max-height:100%;object-fit:contain;display:block;';
         lo.appendChild(li); item.appendChild(lo);
       } else if (!locked) {
@@ -491,29 +492,194 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  function buildItem(domain, removeAction, addAction) {
+  let listLockedUntil = 0;
+  let listLockLoaded = false;
+  const listSettings = document.getElementById('customSettings');
+  const listLockButton = document.getElementById('listLockBtn');
+  const listLockDuration = document.getElementById('listLockDuration');
+  const listLockStatus = document.getElementById('listLockStatus');
+  const listLockToggles = document.querySelectorAll('.list-lock-toggle');
+  const listLockControls = document.getElementById('listLockControls');
+  const listLockCustom = document.getElementById('listLockCustom');
+  const listLockAmount = document.getElementById('listLockAmount');
+  const listLockUnit = document.getElementById('listLockUnit');
+  listLockDuration.addEventListener('change', () => {
+    playClick();
+    listLockCustom.hidden = listLockDuration.value !== 'custom';
+    if (!listLockCustom.hidden) listLockAmount.focus();
+  });
+  listLockUnit.addEventListener('change', () => {
+    playClick();
+    listLockAmount.max = String(525600 / Number(listLockUnit.value));
+  });
+  listLockAmount.max = String(525600 / Number(listLockUnit.value));
+  listLockAmount.addEventListener('change', playClick);
+  let listLockOpener;
+  listLockToggles.forEach(button => button.addEventListener('click', () => {
+    playClick();
+    listLockOpener = button;
+    listLockControls.showModal();
+    button.setAttribute('aria-expanded', 'true');
+  }));
+  document.getElementById('listLockClose').addEventListener('click', () => listLockControls.close());
+  listLockControls.addEventListener('close', () => {
+    playClick();
+    listLockToggles.forEach(button => button.setAttribute('aria-expanded', 'false'));
+    listLockOpener?.focus();
+  });
+  listLockControls.addEventListener('click', event => {
+    const bounds = listLockControls.getBoundingClientRect();
+    if (event.target === listLockControls && (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom)) listLockControls.close();
+  });
+  function listsLocked() { return !listLockLoaded || listLockedUntil > Date.now(); }
+  function renderListLock() {
+    const locked = listsLocked();
+    listSettings.classList.toggle('lists-locked', locked);
+    listSettings.querySelectorAll('input, button:not(.list-lock-toggle)').forEach(control => { control.disabled = locked; });
+    listLockButton.disabled = locked;
+    listLockDuration.disabled = locked;
+    listLockAmount.disabled = locked;
+    listLockUnit.disabled = locked;
+    if (listLockLoaded) listLockStatus.textContent = locked
+      ? 'Locked until ' + new Date(listLockedUntil).toLocaleString()
+      : 'Freeze both lists for the selected time';
+    listLockToggles.forEach(button => {
+      button.dataset.locked = String(listLockLoaded && locked);
+      button.title = listLockLoaded && locked ? listLockStatus.textContent : 'Lock Custom / Exceptions';
+    });
+  }
+  function loadListLock() {
+    browser.runtime.sendMessage({ action: 'getListLock' }, result => {
+      if (!result?.success) { listLockStatus.textContent = 'Could not load lock status. Reopen Yamato to retry.'; return; }
+      listLockLoaded = true;
+      listLockedUntil = result.lockedUntil;
+      renderListLock();
+    });
+  }
+  listLockButton.addEventListener('click', () => {
+    if (listsLocked()) return;
+    playClick();
+    const custom = listLockDuration.value === 'custom';
+    if (custom && !listLockAmount.reportValidity()) return;
+    const amount = Number(listLockAmount.value);
+    const unit = listLockUnit.selectedOptions[0].textContent.toLowerCase();
+    const durationLabel = custom ? `${amount} ${amount === 1 ? unit.slice(0, -1) : unit}` : listLockDuration.selectedOptions[0].textContent;
+    const durationRequest = custom
+      ? { durationMinutes: amount * Number(listLockUnit.value) }
+      : { days: Number(listLockDuration.value) };
+    const dialog = document.createElement('dialog');
+    dialog.className = 'popup-box';
+    dialog.style.color = 'var(--c-text)';
+    dialog.setAttribute('aria-labelledby', 'listLockWarningTitle');
+    const title = document.createElement('h2');
+    title.id = 'listLockWarningTitle'; title.className = 'popup-title'; title.textContent = 'Lock Custom / Exceptions?';
+    const warning = document.createElement('p');
+    warning.style.cssText = 'font-size:13px;line-height:1.6';
+    warning.append(
+      "Review your exceptions first: the blocklist can have false positives. To prevent removing Yamato through the browser, set up force installation ",
+      (() => {
+        const guide = document.createElement('a');
+        guide.href = 'pages/policies.html';
+        guide.target = '_blank';
+        guide.rel = 'noopener';
+        guide.style.color = 'var(--c-accent)';
+        guide.textContent = '(read the guide)';
+        return guide;
+      })(),
+      `. Your blocked sites, exceptions and their on/off switches will be locked for ${durationLabel}. There is no early unlock in Yamato.`,
+    );
+    const status = document.createElement('p'); status.setAttribute('role', 'status'); status.style.fontSize = '12px';
+    const cancel = mkBtn('Cancel');
+    const confirm = mkBtn('Please wait…'); confirm.disabled = true;
+    let token, readyAt, timer, saving = false;
+    dialog.append(title, warning, status, cancel, confirm);
+    document.body.appendChild(dialog); dialog.showModal(); cancel.focus();
+    function dismiss() { if (!saving) { playClick(); dialog.close(); } }
+    cancel.addEventListener('click', dismiss);
+    dialog.addEventListener('cancel', event => { event.preventDefault(); dismiss(); });
+    dialog.addEventListener('close', () => {
+      clearInterval(timer);
+      if (token) browser.runtime.sendMessage({ action: 'cancelListLock', token });
+      dialog.remove(); listLockButton.focus();
+    });
+    browser.runtime.sendMessage({ action: 'prepareListLock', ...durationRequest }, result => {
+      if (!dialog.open) {
+        if (result?.token) browser.runtime.sendMessage({ action: 'cancelListLock', token: result.token });
+        return;
+      }
+      if (!result?.success) { status.textContent = result?.error || 'Could not prepare lock. Cancel and try again.'; loadListLock(); return; }
+      token = result.token; readyAt = result.readyAt;
+      const tick = () => {
+        const seconds = Math.max(0, Math.ceil((readyAt - Date.now()) / 1000));
+        confirm.textContent = seconds ? `Wait ${seconds}s` : `Lock for ${durationLabel}`;
+        confirm.disabled = seconds > 0;
+        if (!seconds) clearInterval(timer);
+      };
+      timer = setInterval(tick, 100); tick();
+    });
+    confirm.addEventListener('click', () => {
+      if (!token || Date.now() < readyAt || saving) return;
+      playClick();
+      saving = true; confirm.disabled = true; cancel.disabled = true;
+      browser.runtime.sendMessage({ action: 'confirmListLock', token }, result => {
+        saving = false; cancel.disabled = false;
+        if (!result?.success) { status.textContent = result?.error || 'Could not save lock. Cancel and try again.'; loadListLock(); return; }
+        listLockedUntil = result.lockedUntil; renderListLock(); loadLists();
+        token = null; dialog.close();
+      });
+    });
+  });
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    if (changes.listLockedUntil) { loadListLock(); loadLists(); }
+    if (changes.enableCustomBlocks || changes.enableCustomExceptions) loadEnableStates();
+  });
+  setInterval(() => {
+    if (listLockLoaded && listSettings.classList.contains('lists-locked') && listLockedUntil <= Date.now()) renderListLock();
+  }, 1000);
+  loadListLock();
+
+  function buildItem(domain, removeAction, pageOnly = false) {
     const li = document.createElement('li');
     const sp = document.createElement('span'); sp.textContent = domain;
     const actions = document.createElement('span'); actions.className = 'item-actions';
+    if (pageOnly) {
+      const note = document.createElement('small'); note.textContent = ' (page only)';
+      note.title = 'This legacy regex applies to page navigation. Use a simpler regex to also match embedded media.';
+      sp.appendChild(note);
+    }
 
     function startEdit() {
-      if (li.classList.contains('editing')) return;
+      if (listsLocked() || li.classList.contains('editing')) return;
       li.classList.add('editing');
       const inp = document.createElement('input');
       inp.type = 'text'; inp.value = domain; inp.className = 'inline-edit';
       li.replaceChild(inp, sp);
       inp.focus(); inp.select();
+      let saving = false;
+      inp.addEventListener('input', () => inp.setCustomValidity(''));
 
       function commit() {
+        if (saving) return;
+        if (listsLocked()) { loadLists(); return; }
         const newVal = inp.value.trim().toLowerCase();
         if (!newVal || newVal === domain) { cancel(); return; }
-        browser.runtime.sendMessage({ action: removeAction, domain }, () => {
-          browser.runtime.sendMessage({ action: addAction, domain: newVal }, r => {
-            if (r?.success) { loadLists(); renderStats(); }
-          });
+        saving = true;
+        inp.readOnly = true;
+        const action = removeAction === 'removeException' ? 'editException' : 'editCustomBlock';
+        browser.runtime.sendMessage({ action, domain, newDomain: newVal }, result => {
+          saving = false;
+          inp.readOnly = false;
+          if (result?.success) { loadLists(); renderStats(); }
+          else {
+            inp.setCustomValidity(result?.error || 'Could not save. Your original entry is unchanged.');
+            inp.reportValidity();
+            loadListLock();
+          }
         });
       }
       function cancel() {
+        if (saving || !li.contains(inp)) return;
         li.classList.remove('editing');
         li.replaceChild(sp, inp);
       }
@@ -530,6 +696,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const rm = document.createElement('span'); rm.textContent = '✕'; rm.className = 'remove-btn';
     rm.onclick = () => {
+      if (listsLocked()) return;
       playClick();
       browser.runtime.sendMessage({ action: removeAction, domain }, r => {
         if (r?.success) { loadLists(); renderStats(); }
@@ -546,12 +713,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       const cl = document.getElementById('customList');
       if (cl) {
         cl.innerHTML = '';
-        (res.customBlocks || []).forEach(d => cl.appendChild(buildItem(d, 'removeCustomBlock', 'addCustomBlock')));
+        (res.customBlocks || []).forEach(d => cl.appendChild(buildItem(d, 'removeCustomBlock', res.pageOnlyRules?.includes(d))));
       }
       const el = document.getElementById('exceptionsList');
       if (el) {
         el.innerHTML = '';
-        (res.customExceptions || []).forEach(d => el.appendChild(buildItem(d, 'removeException', 'addException')));
+        (res.customExceptions || []).forEach(d => el.appendChild(buildItem(d, 'removeException', res.pageOnlyRules?.includes(d))));
       }
       const blocked = document.getElementById('statBlocked');
       if (blocked) blocked.textContent = res.totalBlockCount || 0;
@@ -571,6 +738,82 @@ document.addEventListener('DOMContentLoaded', async () => {
     b.style.background = bg; b.style.borderColor = border; b.style.color = color;
     return b;
   };
+
+  function openBlockingSettings() {
+    const ov = mkOverlay(), box = mkBox();
+    box.classList.add('settings-box');
+    box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Settings'); box.setAttribute('aria-modal', 'true');
+    const title = document.createElement('div'); title.className = 'popup-title'; title.textContent = 'Settings'; box.appendChild(title);
+    const help = document.createElement('p'); help.className = 'settings-help'; help.textContent = 'JC: media · JCE: close page'; box.appendChild(help);
+    const masterRow = document.createElement('label'); masterRow.className = 'settings-master';
+    const masterText = document.createElement('span'); masterText.textContent = 'All sites';
+    const master = document.createElement('select'); master.setAttribute('aria-label', 'All site modules'); master.disabled = true;
+    for (const value of ['off', 'jc', 'jce']) {
+      const option = document.createElement('option'); option.value = value; option.textContent = value === 'off' ? 'Off' : value.toUpperCase(); master.appendChild(option);
+    }
+    masterRow.append(masterText, master); box.appendChild(masterRow);
+    const rows = document.createElement('div'); rows.className = 'settings-grid'; box.appendChild(rows);
+    const status = document.createElement('p'); status.className = 'settings-status'; status.setAttribute('role', 'status'); status.textContent = 'Loading…'; box.appendChild(status);
+    const controls = [];
+    function updateEnabled() { controls.forEach(select => { select.disabled = false; }); }
+    function addRow(label, moduleId, selected) {
+      const row = document.createElement('label'); row.className = 'settings-row';
+      if (!moduleId) row.classList.add('settings-wide');
+      const text = document.createElement('span'); text.textContent = label;
+      const select = document.createElement('select'); select.setAttribute('aria-label', label);
+      for (const value of [...(moduleId ? ['off'] : []), 'jc', 'jce']) {
+        const option = document.createElement('option'); option.value = value; option.textContent = value === 'off' ? 'Off' : value.toUpperCase(); select.appendChild(option);
+      }
+      select.value = selected;
+      select.addEventListener('pointerdown', playClick);
+      select.addEventListener('change', () => {
+        playClick(); select.disabled = true; status.textContent = 'Saving…';
+        browser.runtime.sendMessage({ action: 'setBlockingSetting', moduleId, mode: select.value }, result => {
+          select.disabled = false;
+          if (result?.success) { selected = select.value; status.textContent = 'Saved'; }
+          else { select.value = selected; status.textContent = 'Save failed'; }
+        });
+      });
+      if (moduleId) controls.push(select);
+      row.append(text, select); rows.appendChild(row);
+    }
+    let savedMaster = 'jc';
+    master.addEventListener('change', () => {
+      const selected = master.value;
+      playClick(); master.disabled = true; status.textContent = 'Saving…';
+      browser.runtime.sendMessage({ action: 'setAllSiteModules', mode: selected }, result => {
+        master.disabled = false;
+        if (result?.success) {
+          savedMaster = selected;
+          controls.forEach(select => { select.value = selected; });
+          status.textContent = 'Saved';
+        } else {
+          master.value = savedMaster;
+          status.textContent = 'Save failed';
+        }
+      });
+    });
+    browser.runtime.sendMessage({ action: 'getBlockingSettings' }, result => {
+      if (!result?.success) { status.textContent = 'Load failed'; return; }
+      savedMaster = result.enableSiteModules ? result.siteModules[yamatoSites.definitions[0].id] : 'off';
+      master.value = savedMaster; master.disabled = false;
+      for (const site of yamatoSites.definitions) addRow(site.name, site.id, result.siteModules[site.id]);
+      addRow('Blocked-domain media', null, result.mediaBlockMode);
+      updateEnabled(); status.textContent = '';
+    });
+    const dismiss = () => { playClick(); ov.remove(); document.getElementById('blockingSettingsBtn')?.focus(); };
+    const close = mkBtn('Done'); close.style.width = '100%'; close.addEventListener('click', dismiss); box.appendChild(close);
+    ov.addEventListener('click', event => { if (event.target === ov) dismiss(); });
+    ov.addEventListener('keydown', event => {
+      if (event.key === 'Escape') { event.preventDefault(); dismiss(); }
+      if (event.key === 'Tab') {
+        const focusable = [...box.querySelectorAll('input:not(:disabled), select:not(:disabled), button')];
+        const next = (focusable.indexOf(document.activeElement) + (event.shiftKey ? -1 : 1) + focusable.length) % focusable.length;
+        event.preventDefault(); focusable[next].focus();
+      }
+    });
+    ov.appendChild(box); document.body.appendChild(ov); close.focus();
+  }
 
   function openInfoPopup() {
     const ov = mkOverlay(), box = mkBox();
@@ -709,6 +952,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const d = (customUrl?.value || '').trim().toLowerCase();
       if (d) browser.runtime.sendMessage({ action:'addCustomBlock', domain:d }, r => {
         if (r?.success) { customUrl.value = ''; loadLists(); renderStats(); }
+        else { customUrl.setCustomValidity(r?.error || 'Could not save this entry.'); customUrl.reportValidity(); }
       });
     });
   }
@@ -719,20 +963,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       const d = (excUrl?.value || '').trim().toLowerCase();
       if (d) browser.runtime.sendMessage({ action:'addException', domain:d }, r => {
         if (r?.success) { excUrl.value = ''; loadLists(); }
+        else { excUrl.setCustomValidity(r?.error || 'Could not save this entry.'); excUrl.reportValidity(); }
       });
     });
   }
   
+  for (const input of [customUrl, excUrl]) input?.addEventListener('input', () => input.setCustomValidity(''));
   if (customUrl) customUrl.addEventListener('keypress', e => { if (e.key === 'Enter') addBtn?.click(); });
   if (excUrl)    excUrl.addEventListener('keypress',    e => { if (e.key === 'Enter') addExcBtn?.click(); });
-  if (cbToggle)  cbToggle.addEventListener('change',  () => { playClick(); browser.runtime.sendMessage({ action:'setEnableCustomBlocks',    enabled: cbToggle.checked }); });
-  if (excToggle) excToggle.addEventListener('change', () => { playClick(); browser.runtime.sendMessage({ action:'setEnableCustomExceptions', enabled: excToggle.checked }); });
+  if (cbToggle)  cbToggle.addEventListener('change',  () => { playClick(); browser.runtime.sendMessage({ action:'setEnableCustomBlocks',    enabled: cbToggle.checked }, () => { loadEnableStates(); loadListLock(); }); });
+  if (excToggle) excToggle.addEventListener('change', () => { playClick(); browser.runtime.sendMessage({ action:'setEnableCustomExceptions', enabled: excToggle.checked }, () => { loadEnableStates(); loadListLock(); }); });
 
   const execBtn = document.getElementById('executeBtn');
   if (execBtn) {
     let jceBusy = false;
     execBtn.addEventListener('click', () => {
-      // FIX 3: prevent sound flood — ignore clicks while a JCE is already in flight
+      // prevent sound flood — ignore clicks while a JCE is already in flight
       if (jceBusy) return;
       jceBusy = true;
       execBtn.style.opacity = '0.45';
@@ -766,7 +1012,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // FIX 4: regex helper buttons — clicking inserts a ~regex pattern for the current domain
+  // regex helper buttons — clicking inserts a ~regex pattern for the current domain
   function makeRegexForDomain(url) {
     try {
       const u = new URL(url);
@@ -801,7 +1047,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   await loadMode();
-  // FIX 4: load streak first, then render stats — streakData is guaranteed set before renderStats()
+  // load streak first, then render stats — streakData is guaranteed set before renderStats()
   streakData = await loadStreak();
   renderBadge(streakData);
   updateLocks(streakData);

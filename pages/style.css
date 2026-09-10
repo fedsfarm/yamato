@@ -1,4 +1,5 @@
 :root {
+    color-scheme: dark;
     --bg: #000000;
     --green: #00ff41;
     --orange: #ff6600;
@@ -14,12 +15,12 @@
 
 html,
 body {
-    height: 100%;
+    min-height: 100%;
     overflow-x: hidden;
     font-size: 16px;
     color: var(--green);
-    -webkit-text-size-adjust: none;
-    text-size-adjust: none;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 }
 
 body {
@@ -200,10 +201,25 @@ img {
     margin: 20px 0;
 }
 
-.changelog-list p {
+.changelog-list li {
     margin: 10px 0;
     color: var(--muted);
 }
+
+.terminal { width: calc(100% - 32px); }
+.guide { max-width: 860px; text-align: left; padding: 28px; line-height: 1.65; }
+.guide h2 { margin: 28px 0 12px; color: var(--green); font-size: 1.35rem; }
+.guide h3 { margin: 16px 0 8px; font-size: 1rem; }
+.guide p, .guide a { font-size: 1rem; }
+.guide code { font-size: 0.85em; overflow-wrap: anywhere; }
+.guide pre { position: relative; margin: 12px 0 16px; padding: 48px 16px 16px; background: #061109; border: 1px solid rgba(0, 255, 65, 0.25); border-radius: 8px; }
+.guide pre code { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
+.guide .copy-command { position: absolute; top: 4px; right: 4px; padding: 4px 10px; font-size: 0.8rem; }
+.guide .note { padding-left: 16px; border-left: 2px solid var(--green); }
+.guide details { margin: 16px 0; }
+.guide summary { cursor: pointer; padding: 8px 0; }
+.guide .footnote { margin-top: 24px; font-size: 0.9rem; }
+button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--green); outline-offset: 4px; }
 
 /* Responsive */
 @media (max-width: 768px) {

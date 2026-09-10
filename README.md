@@ -6,7 +6,7 @@
 
 Prevents you from being unmotivated
 
-Latest update: [feds.farm/posts/yamato2-1/](https://feds.farm/blog/posts/yamato2-1/)
+Version **2.2.0** · [Latest blog post](https://feds.farm/blog/posts/yamato2-2/)
 
 Homepage: [yamato.feds.farm](https://yamato.feds.farm) 
 
@@ -22,27 +22,50 @@ Homepage: [yamato.feds.farm](https://yamato.feds.farm)
 
 [Download from Firefox ADD-ONS](https://addons.mozilla.org/en-US/firefox/addon/yamato-blocker/)
 
-## Chrome/chromium/edge
+## Chrome / Chromium / Edge
 
-https://feds.farm/blog/posts/yamato2-0/#what-s-the-deal-with-chrome-chromium-and-edge
+### Linux - CRX
 
-1. Download and unpack the latest version https://github.com/fedsfarm/yamato/releases/
-2. Browse to chrome://extensions/ and press enable the developer mode (top-right corner)
-3. Load unpacked -> select the location with an unpacked .zip
+1. Download `yamato-chrome.crx` from [releases](https://github.com/fedsfarm/yamato/releases/latest).
+   If it isn't listed, use the ZIP steps below.
+2. Open `chrome://extensions` and enable **Developer mode**.
+3. Drag the downloaded file onto that page and click **Add extension**.
 
-Since the auto updates aren't working you can subscribe to my blog https://feds.farm/blog/ and manage them manually
+CRX installations update automatically from GitHub Releases.
+
+### Windows / macOS / Linux - ZIP
+
+1. Download `yamato-chrome.zip` from [releases](https://github.com/fedsfarm/yamato/releases/latest) and extract it.
+2. Open `chrome://extensions` (Edge: `edge://extensions`).
+3. Enable **Developer mode**.
+4. Click **Load unpacked** and select the folder containing `manifest.json`.
+5. Keep that folder on your computer.
+
+To update:
+
+1. Download and extract the new ZIP.
+2. Replace the files in the folder you installed from.
+3. Open the extensions page and click **Reload** on Yamato.
+
+You can subscribe to my [blog](https://feds.farm/blog/) or follow this repo to get the updates.
 
 ## Opera
 
 [Well, well, well...](https://forums.opera.com/topic/16609/very-long-extension-moderation-process/446) use the method for chrome
 
-## Android / IOS
+## Android
 
-It should work on Firefox Mobile and forks
+Use Firefox for Android or a compatible fork. Firefox for iOS does not support this extension.
+
+## Hardening
+
+See the [hardening guide with Linux and Windows one-liners](pages/policies.html) for Firefox
+and Chrome. Policies prevent normal disabling/removal; the timed lock protects list
+settings. Administrator access is needed to install policies.
 
 ## Privacy
 
-It does 0 network requests
+Blocklists and media are bundled locally. Yamato does not send your browsing history to a server.
 
 ## Questions, bugs, suggestions, chat
 
@@ -50,7 +73,10 @@ Feel free to join our matrix room [#main:feds.farm](https://escape.feds.farm#mai
 
 My DMs on matrix (prefered) [@root:feds.farm](https://escape.feds.farm#@root:feds.farm) or email [root@feds.farm](mailto:root@feds.farm)
 
-If you want to contribute feel free to open a pull request
+Contributing? See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+AI code is allowed if it's submitted and tested by a human.
+
 
 ## Credits:
 
@@ -60,6 +86,7 @@ If you want to contribute feel free to open a pull request
 - Dante status by [@lambiticousroofius2680](https://www.youtube.com/@lambiticousroofius2680)
 - Secret status by [@othertin](https://www.youtube.com/@othertin)
 - Nero status by [@GenAlphaPro](https://www.youtube.com/@GenAlphaPro)
+- JC video by [@hixer-a-50](https://www.youtube.com/@hixer-a-50)
 - Ranks by [@thescarletphoenix7894](https://www.youtube.com/@thescarletphoenix7894)
 
 ### Music

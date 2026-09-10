@@ -1,14 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Yamato",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Prevents you from being unmotivated",
+  "update_url": "https://github.com/fedsfarm/yamato/releases/latest/download/updates.xml",
   "permissions": [
     "tabs",
     "storage",
     "scripting",
     "offscreen",
     "webRequest",
+    "declarativeNetRequestWithHostAccess",
     "webNavigation"
   ],
   "host_permissions": [
@@ -29,6 +31,44 @@
   "background": {
     "service_worker": "background.js"
   },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "site-main.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": true
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "site-modules.js",
+        "media.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": true,
+      "css": [
+        "media.css"
+      ]
+    }
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "blocked_media",
+        "enabled": true,
+        "path": "media-rules.json"
+      }
+    ]
+  },
   "web_accessible_resources": [
     {
       "resources": [
@@ -36,7 +76,9 @@
         "public/*",
         "pages/*"
       ],
-      "matches": ["<all_urls>"]
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "icons": {
@@ -44,5 +86,6 @@
     "32": "vergil.png",
     "48": "vergil.png",
     "128": "vergil.png"
-  }
+  },
+  "minimum_chrome_version": "111"
 }

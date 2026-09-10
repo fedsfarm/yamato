@@ -1,0 +1,9 @@
+/* Manifest CSS arrives before parser-created and inline thumbnails can paint. */
+:root:not([data-yamato-ready]) body {
+  opacity: 0 !important;
+}
+:is(img, video, audio, iframe, embed, object, [data-yamato-background]):not([data-yamato-checked]):not([data-yamato-replacement]),
+:is(img, video, audio, iframe, embed, object)[data-yamato-held-src]:not([data-yamato-replacement]) {
+  visibility: hidden !important;
+  opacity: 0 !important;
+}

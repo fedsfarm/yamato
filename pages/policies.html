@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yamato — Hardening guide</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <main class="terminal guide">
+    <span class="badge">YAMATO / HARDENING</span>
+    <h1>Keep Yamato installed</h1>
+    <p>Force-install Yamato to prevent disabling or removal. Requires administrator access.</p>
+
+    <h2>Firefox</h2>
+    <p>Run one command, then restart Firefox. If a policy file already exists, merge Yamato’s entry into it.</p>
+    <h3>Linux · terminal</h3>
+    <pre><code>sudo mkdir -p /etc/firefox/policies &amp;&amp; printf '%s\n' '{"policies":{"ExtensionSettings":{"root@zeroarch.org":{"installation_mode":"force_installed","install_url":"https://addons.mozilla.org/firefox/downloads/latest/yamato-blocker/latest.xpi"}}}}' | sudo sh -c 'umask 022; set -C; cat &gt; /etc/firefox/policies/policies.json'</code></pre>
+    <h3>Windows · PowerShell as administrator</h3>
+    <pre><code>$p = "$env:ProgramFiles\Mozilla Firefox\distribution"; New-Item -ItemType Directory -Force -Path $p -ErrorAction Stop | Out-Null; New-Item -ItemType File -Path "$p\policies.json" -Value '{"policies":{"ExtensionSettings":{"root@zeroarch.org":{"installation_mode":"force_installed","install_url":"https://addons.mozilla.org/firefox/downloads/latest/yamato-blocker/latest.xpi"}}}}' -ErrorAction Stop</code></pre>
+    <p>Custom install: adjust <code>$p</code>. Managed Firefox: use Group Policy instead.</p>
+    <details>
+      <summary>Manual setup / macOS</summary>
+      <p>Save as <code>policies.json</code>; merge with existing policies. macOS folder: <code>/Applications/Firefox.app/Contents/Resources/distribution/</code>.</p>
+      <pre><code>{
+  "policies": {
+    "ExtensionSettings": {
+      "root@zeroarch.org": {
+        "installation_mode": "force_installed",
+        "install_url": "https://addons.mozilla.org/firefox/downloads/latest/yamato-blocker/latest.xpi"
+      }
+    }
+  }
+}</code></pre>
+    </details>
+    <p><strong>Check:</strong> <code>about:policies</code> for errors; <code>about:addons</code> to confirm removal is disabled.</p>
+
+    <h2>Chrome / Chromium</h2>
+      <h3>Linux · terminal</h3>
+      <pre><code>sudo mkdir -p /etc/opt/chrome/policies/managed &amp;&amp; printf '%s\n' '{"ExtensionInstallForcelist":["lcjglagcjlajleojohmbcfmjdhbgkadc;https://github.com/fedsfarm/yamato/releases/latest/download/updates.xml"]}' | sudo sh -c 'umask 022; set -C; cat &gt; /etc/opt/chrome/policies/managed/yamato.json'</code></pre>
+      <p>Chromium: use <code>/etc/chromium/policies/managed</code>. Already using ExtensionInstallForcelist? Append Yamato to that list.</p>
+      <h3>Windows · Command Prompt as administrator</h3>
+      <pre><code>reg add "HKLM\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist" /v 1 /t REG_SZ /d "lcjglagcjlajleojohmbcfmjdhbgkadc;https://github.com/fedsfarm/yamato/releases/latest/download/updates.xml"</code></pre>
+      <p>Use an unused number for <code>1</code>. Windows requires AD / Entra ID join or Chrome Enterprise Core enrollment.</p>
+      <details>
+        <summary>macOS · Chrome Enterprise Core setup</summary>
+        <p>1. <a href="https://support.google.com/chrome/a/answer/9301420">Set up Chrome Enterprise Core</a> with a business email/domain. It is free; this route needs no MDM subscription.</p>
+        <p>2. In Google Admin, open <strong>Chrome browser → Managed browsers → Enroll</strong> and copy the enrollment token.</p>
+        <p>3. Replace <code>YOUR_TOKEN</code> below, run in Terminal, then fully quit and reopen Chrome. Confirm it appears under Managed browsers.</p>
+        <pre><code>sudo mkdir -p /Library/Google/Chrome &amp;&amp; printf '%s' 'YOUR_TOKEN' | sudo sh -c 'umask 022; set -C; cat &gt; /Library/Google/Chrome/CloudManagementEnrollmentToken'</code></pre>
+        <p>4. Open <strong>Chrome browser → Apps &amp; extensions → Users &amp; browsers</strong>. Select the enrolled browser’s organizational unit, click <strong>+ → Add Chrome app or extension by ID</strong>, and enter:</p>
+        <pre><code>lcjglagcjlajleojohmbcfmjdhbgkadc</code></pre>
+        <p>Select <strong>From a custom URL</strong> and enter:</p>
+        <pre><code>https://github.com/fedsfarm/yamato/releases/latest/download/updates.xml</code></pre>
+        <p>5. Save, set <strong>Installation policy → Force install</strong>, and save again. The URL must serve an update manifest pointing to Yamato’s signed CRX.</p>
+        <p><a href="https://support.google.com/chrome/a/answer/9301891">Enrollment instructions</a> · <a href="https://support.google.com/chrome/a/answer/6177447">Extension settings</a></p>
+      </details>
+      <p><strong>Check:</strong> <code>chrome://policy</code> → Reload policies, then confirm installation in <code>chrome://extensions</code>.</p>
+    <p class="footnote">Undo: remove Yamato’s policy entry and restart. Chrome may uninstall it.</p>
+    <a class="back" href="update.html">← What’s new in Yamato</a>
+  </main>
+</body>
+</html>

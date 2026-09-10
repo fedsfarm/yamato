@@ -16,6 +16,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Build dependencies
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg zip
+
       - name: Build
         run: |
           chmod +x ./build.sh

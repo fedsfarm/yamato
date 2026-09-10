@@ -1,0 +1,9 @@
+{
+  "tasks": {
+    "build": "./build.sh",
+    "dev": "deno task dev:firefox",
+    "dev:firefox": "deno task build && deno run -A npm:web-ext@^8.10.0 run --source-dir=dist-firefox",
+    "dev:chromium": "deno task build && chromium --disable-extensions-except=dist-chrome --load-extension=dist-chrome --user-data-dir=/tmp/chrome-ext-dev"
+  },
+  "minimumDependencyAge": "P3D"
+}
