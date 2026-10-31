@@ -92,11 +92,14 @@
       if (held === String(value)) return element.getAttribute(name) || '';
       if (held === null && element.hasAttribute('data-yamato-checked') &&
           element.getAttribute(name) === String(value) && !shouldBlock(element, value)) return value;
+      // Checked media keeps showing its approved source until the new one
+      // passes; a placeholder would blank it and refetch from scratch.
+      const shown = element.hasAttribute('data-yamato-checked') ? element.getAttribute(name) : null;
       element.removeAttribute('data-yamato-approved');
-      element.removeAttribute('data-yamato-checked');
+      if (shown === null) element.removeAttribute('data-yamato-checked');
       nativeSet.call(element, 'data-yamato-held-' + name, String(value));
       nativeDispatch.call(element, new Event('yamato-search-media', { bubbles: true, composed: true }));
-      return blank + '#yamato-pending';
+      return shown ?? blank + '#yamato-pending';
     }
     if (!shouldBlock(element, value)) return value;
     busy = true;

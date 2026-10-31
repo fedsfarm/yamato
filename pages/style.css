@@ -1,12 +1,27 @@
+@font-face { font-family: "Inter"; src: url("fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("fonts/jetbrains-mono.woff2") format("woff2"); font-weight: 100 800; font-display: swap; }
+
+/* Matches the feds.farm grey theme. */
 :root {
     color-scheme: dark;
-    --bg: #000000;
-    --green: #00ff41;
-    --orange: #ff6600;
-    --muted: rgba(0, 255, 65, 0.75);
-    --radius: 12px;
-    font-family: 'Courier New', Courier, monospace;
+    --bg: #0d0f13;
+    --bg-2: #12151a;
+    --bg-3: #181c23;
+    --line: #20252e;
+    --line-2: #2c323d;
+    --fg: #d8dee9;
+    --fg-hi: #eceff4;
+    --muted: #8b94a4;
+    --faint: #5b6473;
+    --accent: #88c0d0;
+    --accent-2: #81a1c1;
+    --warn: #d08770;
+    --sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --radius: 3px;
+    font-family: var(--sans);
 }
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -18,7 +33,8 @@ body {
     min-height: 100%;
     overflow-x: hidden;
     font-size: 16px;
-    color: var(--green);
+    color: var(--fg);
+    -webkit-font-smoothing: antialiased;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
 }
@@ -27,178 +43,108 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    min-height: 100vh;
+    padding: 24px 0;
     background: var(--bg);
-    position: relative;
 }
 
-/* Background */
-.video-wrapper {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: -1;
-    filter: blur(4px) brightness(0.5);
-}
-
-.video-wrapper video {
-    position: absolute;
-    top: -20%;
-    left: 50%;
-    width: 100vw;
-    height: 120vh;
-    object-fit: cover;
-    transform: translateX(-50%);
-}
-
-/* Layout */
-main.wrap {
-    width: 85%;
-    max-width: 1100px;
-    padding: 40px;
-    border-radius: var(--radius);
-    background: rgba(0, 0, 0, 0.75);
-    backdrop-filter: blur(12px);
-    display: flex;
-    gap: 32px;
-    border: 1px solid rgba(0, 255, 65, 0.2);
-    flex-wrap: wrap;
-}
-
-/* Sections */
-.content {
-    flex: 1 1 400px;
-    min-width: 280px;
-}
-
-.video-panel {
-    flex: 1 1 300px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.video-panel video {
-    max-width: 100%;
-    border-radius: var(--radius);
-}
-
-/* Branding */
-.brand {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    margin-bottom: 20px;
-}
-
-.badge {
-    background: var(--green);
-    color: var(--bg);
-    padding: 6px 12px;
-    border-radius: 999px;
-    font-weight: 700;
-    font-size: 14px;
-}
+::selection { background: var(--accent); color: var(--bg); }
 
 /* Text */
 h1 {
-    font-size: 2rem;
+    font-size: clamp(1.6rem, 3vw, 2.1rem);
+    font-weight: 600;
+    line-height: 1.15;
+    color: var(--fg-hi);
     margin: 12px 0;
 }
 
 h2 {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
+    font-weight: 600;
     color: var(--muted);
-    margin-bottom: 12px;
+    margin-bottom: 16px;
 }
 
 p {
-    font-size: 1.1rem;
+    font-size: 1.05rem;
+    line-height: 1.6;
     color: var(--muted);
     margin-bottom: 16px;
 }
 
 a {
-    font-size: 1.1rem;
-    color: var(--green);
-    margin-bottom: 16px;
-}
-
-/* Buttons */
-.buttons {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-}
-
-a.btn {
-    padding: 10px 18px;
-    border-radius: 12px;
+    color: var(--accent);
     text-decoration: none;
-    color: var(--green);
-    border: 1px solid rgba(0, 255, 65, 0.4);
-    font-weight: 600;
+    transition: color .15s;
 }
 
-a.btn.primary {
-    background: var(--green);
-    color: var(--bg);
-    border: none;
+a:hover { color: var(--fg-hi); }
+
+hr {
+    border: 0;
+    border-top: 1px solid var(--line);
+    margin: 20px 0;
 }
 
-/* Back link (ONLY orange usage) */
+.badge {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--faint);
+}
+
 .back {
-    color: var(--orange);
-    text-decoration: underline;
-    transition: 0.2s;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 13px;
 }
 
-.back:hover {
-    color: #ff8833;
-    text-shadow: 0 0 6px var(--orange);
-}
+.back:hover { color: var(--warn); }
 
-/* Terminal styles for install and update pages */
+/* Card for install, update and guide pages */
 .terminal {
-    background: rgba(0, 0, 0, 0.8);
-    border: 1px solid var(--green);
-    border-radius: var(--radius);
-    padding: 20px;
-    text-align: center;
+    width: calc(100% - 32px);
     max-width: 600px;
     margin: 20px auto;
+    padding: 32px;
+    text-align: center;
+    background: var(--bg-2);
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius);
 }
 
 button {
     padding: 10px 18px;
-    border-radius: 12px;
-    background: transparent;
-    color: var(--green);
-    border: 1px solid rgba(0, 255, 65, 0.4);
-    font-weight: 600;
-    cursor: pointer;
     margin: 5px;
-    font-family: inherit;
-    font-size: inherit;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--fg);
+    background: var(--bg-3);
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
 }
 
 button:hover {
-    background: var(--green);
     color: var(--bg);
+    background: var(--accent);
+    border-color: var(--accent);
 }
 
 img {
+    display: block;
     max-width: 100%;
     height: auto;
+    margin: 20px auto;
+    border: 1px solid var(--line-2);
     border-radius: var(--radius);
 }
 
 .changelog-list {
     text-align: left;
     list-style: none;
-    padding: 0;
-    margin: 20px 0;
 }
 
 .changelog-list li {
@@ -206,28 +152,48 @@ img {
     color: var(--muted);
 }
 
-.terminal { width: calc(100% - 32px); }
-.guide { max-width: 860px; text-align: left; padding: 28px; line-height: 1.65; }
-.guide h2 { margin: 28px 0 12px; color: var(--green); font-size: 1.35rem; }
-.guide h3 { margin: 16px 0 8px; font-size: 1rem; }
+.changelog-list li::before {
+    content: "+ ";
+    font-family: var(--mono);
+    color: var(--accent);
+}
+
+/* Hardening guide */
+.guide { max-width: 860px; text-align: left; padding: 32px 36px; line-height: 1.65; }
+.guide h2 { margin: 32px 0 12px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--fg-hi); font-size: 1.3rem; }
+.guide h3 { margin: 16px 0 8px; font-size: 1rem; font-weight: 600; color: var(--fg); }
 .guide p, .guide a { font-size: 1rem; }
-.guide code { font-size: 0.85em; overflow-wrap: anywhere; }
-.guide pre { position: relative; margin: 12px 0 16px; padding: 48px 16px 16px; background: #061109; border: 1px solid rgba(0, 255, 65, 0.25); border-radius: 8px; }
-.guide pre code { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
-.guide .copy-command { position: absolute; top: 4px; right: 4px; padding: 4px 10px; font-size: 0.8rem; }
-.guide .note { padding-left: 16px; border-left: 2px solid var(--green); }
-.guide details { margin: 16px 0; }
-.guide summary { cursor: pointer; padding: 8px 0; }
-.guide .footnote { margin-top: 24px; font-size: 0.9rem; }
-button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--green); outline-offset: 4px; }
+.guide strong { color: var(--fg-hi); }
+.guide code { font-family: var(--mono); font-size: 0.85em; color: var(--fg); overflow-wrap: anywhere; }
+.guide pre { position: relative; margin: 12px 0 16px; padding: 44px 16px 16px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); }
+.guide pre code { display: block; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+.guide .copy-command { position: absolute; top: 6px; right: 6px; margin: 0; padding: 4px 10px; font-size: 12px; }
+.guide .note { padding-left: 16px; border-left: 2px solid var(--accent); }
+.guide details { margin: 16px 0; padding: 0 16px; border: 1px solid var(--line); border-radius: var(--radius); }
+.guide summary { cursor: pointer; padding: 10px 0; font-weight: 600; color: var(--fg); }
+.guide summary:hover { color: var(--fg-hi); }
+.guide .footnote { margin-top: 24px; font-size: 0.9rem; color: var(--faint); }
+:focus-visible { outline: 1.5px solid var(--accent); outline-offset: 2px; }
+
+/* Settings page */
+.settings { max-width: 720px; }
+.setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; padding: 8px 0; border-bottom: 1px solid var(--line); color: var(--fg); cursor: pointer; }
+.setting small { display: block; font-size: 13px; color: var(--faint); }
+.setting-all { font-weight: 600; color: var(--fg-hi); }
+.setting-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); column-gap: 32px; }
+.settings select { min-width: 76px; padding: 6px 10px; font: inherit; font-size: 14px; color: var(--fg); background: var(--bg-3); border: 1px solid var(--line-2); border-radius: var(--radius); cursor: pointer; }
+.settings select:hover { border-color: var(--accent-2); }
+.settings :disabled { opacity: .5; cursor: progress; }
+.setting > span:first-child { flex: 1 1 auto; min-width: 120px; }
+.settings .range { display: flex; flex: 0 1 260px; align-items: center; gap: 12px; min-width: 0; }
+.settings input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }
+.settings output { min-width: 56px; font-family: var(--mono); font-size: 13px; color: var(--muted); text-align: right; }
+.settings .actions { display: flex; gap: 10px; }
+.settings .actions button { margin: 0; }
+.settings .status { min-height: 1.6em; margin: 24px 0 8px; font-family: var(--mono); font-size: 13px; color: var(--accent); }
 
 /* Responsive */
 @media (max-width: 768px) {
-    main.wrap {
-        flex-direction: column;
-        padding: 30px;
-    }
-
     h1 {
         font-size: 1.6rem;
     }
@@ -237,7 +203,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
     }
 
     .terminal {
-        padding: 15px;
+        padding: 22px;
         margin: 10px auto;
     }
 }

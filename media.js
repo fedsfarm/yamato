@@ -162,9 +162,8 @@
     }
     const check = { key };
     searchChecks.set(item, check);
-    for (const element of [item, ...sites.query(item, selector)]) {
-      element.removeAttribute('data-yamato-checked');
-    }
+    // Checked media stays visible: new sources are held and changed
+    // backgrounds lose their check before the item is rechecked.
     try {
       const blocked = (await checkURLs(urls)).length > 0;
       if (searchChecks.get(item) !== check || !item.isConnected) return;

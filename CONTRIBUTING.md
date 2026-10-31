@@ -15,7 +15,7 @@ use `() => false` without API flags. Optional: `detect(doc)` for variable hosts,
 
 `background.js`: blocking. `media.js` / `media.css`: replacements.
 `site-guard.js`: page hooks. `run.js`: full-page effect. `offscreen.js`: audio.
-`popup.js`: settings. `build.sh` / `build-media-rules.js`: packaging.
+`popup.js`: popup. `settings.js`: settings page. `build.sh` / `build-media-rules.js`: packaging.
 
 Build: install Deno, FFmpeg and zip, then run `deno task build`.
 Load `dist-chrome` / `dist-firefox`; check safe, flagged and new posts in

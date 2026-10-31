@@ -2,12 +2,14 @@
 globalThis.yamatoJCAudio = (() => {
   const voices = new Set();
   const limit = 8;
+  let level = 0.65;
   function balance() {
     // Never raise an existing voice as others end: that creates volume pumping.
-    const volume = 0.65 / Math.max(1, voices.size);
+    const volume = level / Math.max(1, voices.size);
     for (const voice of voices) voice.audio.volume = Math.min(voice.audio.volume, volume);
   }
-  async function play(url) {
+  async function play(url, volume = 0.65) {
+    level = volume;
     if (voices.size >= limit) voices.values().next().value.stop();
     const audio = new Audio(url);
     const voice = { audio, stop() {
@@ -38,7 +40,7 @@ if (globalThis.location?.pathname === '/offscreen.html') {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.target === 'offscreen' && message.action === 'playSound' && !sender.tab) {
     if (message.assetPath === 'public/sounds/jc.ogg') {
-      yamatoJCAudio.play(chrome.runtime.getURL(message.assetPath)).then(sendResponse, () => sendResponse({started: false}));
+      yamatoJCAudio.play(chrome.runtime.getURL(message.assetPath), message.volume).then(sendResponse, () => sendResponse({started: false}));
       return true;
     }
     const audio = new Audio(chrome.runtime.getURL(message.assetPath));

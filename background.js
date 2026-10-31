@@ -9,7 +9,7 @@ globalThis.createListLock = function (storage, now = Date.now) {
   const durations = [1 / 24, 1, 3, 7, 14, 30];
   const mutations = new Set([
     'addCustomBlock', 'removeCustomBlock', 'addException', 'removeException',
-    'editCustomBlock', 'editException',
+    'editCustomBlock', 'editException', 'importLists',
     'setEnableCustomBlocks', 'setEnableCustomExceptions',
   ]);
   const actions = new Set(['getListLock', 'prepareListLock', 'confirmListLock', 'cancelListLock']);
@@ -342,6 +342,15 @@ function normalizeDomain(input) {
   return normalizedDomain + path;
 }
 
+// Mirror a saved custom list into the navigation sets.
+function applyList(key, previous, updated, enabled) {
+  const active = key === 'customExceptions' ? exceptions : domains;
+  for (const entry of previous) {
+    if (active === exceptions || !mediaBlocking.bundled(entry)) active.delete(entry);
+  }
+  if (enabled) updated.forEach(entry => active.add(entry));
+}
+
 function isBlocked(hostname, pathname, blocks, exceptions) {
   hostname = hostname.toLowerCase();
   pathname = pathname.toLowerCase();
@@ -478,12 +487,12 @@ async function ensureAudioDocument() {
 }
 
 // Helper: play sound via offscreen or the Firefox background document.
-async function playSound(soundFile, assetPath = 'public/sounds/' + soundFile) {
+async function playSound(soundFile, assetPath = 'public/sounds/' + soundFile, volume) {
   if (chrome.offscreen) {
     await ensureAudioDocument();
-    return chrome.runtime.sendMessage({ action: 'playSound', target: 'offscreen', assetPath });
+    return chrome.runtime.sendMessage({ action: 'playSound', target: 'offscreen', assetPath, volume });
   } else {
-    if (assetPath === yamatoJC.sound.slice(1)) return yamatoJCAudio.play(browser.runtime.getURL(assetPath));
+    if (assetPath === yamatoJC.sound.slice(1)) return yamatoJCAudio.play(browser.runtime.getURL(assetPath), volume);
     const audio = new Audio(browser.runtime.getURL(assetPath));
     await audio.play();
     return { started: true };
@@ -522,7 +531,8 @@ function handleMessage(msg, sender, sendResponse) {
 
   if (msg.action === 'playJCSound') {
     if (!sender.tab) { sendResponse({ started: false }); return; }
-    playSound(null, yamatoJC.sound.slice(1))
+    browser.storage.local.get('jcVolume')
+      .then(({ jcVolume = 65 }) => jcVolume > 0 ? playSound(null, yamatoJC.sound.slice(1), jcVolume / 100) : { started: true })
       .then(sendResponse)
       .catch(error => {
         console.warn('JC sound failed:', error);
@@ -532,9 +542,44 @@ function handleMessage(msg, sender, sendResponse) {
   }
 
   if (msg.action === 'getBlockingSettings') {
-    browser.storage.local.get(['siteModules', 'mediaBlockMode', 'enableSiteModules'])
-      .then(value => sendResponse({ success: true, ...yamatoSites.settings(value) }))
+    browser.storage.local.get(['siteModules', 'mediaBlockMode', 'enableSiteModules', 'jcVolume'])
+      .then(value => sendResponse({ success: true, ...yamatoSites.settings(value), jcVolume: value.jcVolume ?? 65 }))
       .catch(() => sendResponse({ success: false }));
+    return true;
+  }
+  if (msg.action === 'setJCVolume') {
+    if (!Number.isInteger(msg.volume) || msg.volume < 0 || msg.volume > 100) { sendResponse({ success: false, error: 'Invalid volume' }); return; }
+    browser.storage.local.set({ jcVolume: msg.volume })
+      .then(() => sendResponse({ success: true }), () => sendResponse({ success: false, error: 'Save failed' }));
+    return true;
+  }
+  if (msg.action === 'importLists') {
+    (async () => {
+      try {
+        const keys = ['customBlocks', 'customExceptions'];
+        const valid = list => list === undefined || Array.isArray(list) && list.length <= 10000 &&
+          list.every(entry => typeof entry === 'string' && entry.length <= 2048);
+        if (!keys.some(key => Array.isArray(msg[key])) || !keys.every(key => valid(msg[key]))) throw new Error('This is not a Yamato lists file.');
+        await mediaBlocking.ready;
+        const stored = await browser.storage.local.get([...keys, 'enableCustomBlocks', 'enableCustomExceptions']);
+        // Merge: imports add entries and never remove existing ones.
+        const changes = {};
+        let added = 0;
+        for (const key of keys) {
+          const updated = new Set(stored[key] || []);
+          const before = updated.size;
+          for (const entry of (msg[key] || []).map(normalizeDomain)) if (entry) updated.add(entry);
+          added += updated.size - before;
+          changes[key] = [...updated];
+        }
+        if (added) {
+          await mediaBlocking.sync(changes);
+          applyList('customBlocks', stored.customBlocks || [], changes.customBlocks, stored.enableCustomBlocks !== false);
+          applyList('customExceptions', stored.customExceptions || [], changes.customExceptions, stored.enableCustomExceptions !== false);
+        }
+        sendResponse({ success: true, added });
+      } catch (error) { sendResponse({ success: false, error: error.message || 'Could not import the lists.' }); }
+    })();
     return true;
   }
   if (msg.action === 'setBlockingSetting') {
@@ -672,11 +717,7 @@ function handleMessage(msg, sender, sendResponse) {
         // Validate and commit the complete list before changing navigation state.
         // sync restores the previous network rules if saving storage fails.
         await mediaBlocking.sync({ [key]: updated });
-        const active = isException ? exceptions : domains;
-        for (const entry of previous) {
-          if (isException || !mediaBlocking.bundled(entry)) active.delete(entry);
-        }
-        if (stored[enabledKey] !== false) updated.forEach(entry => active.add(entry));
+        applyList(key, previous, updated, stored[enabledKey] !== false);
         sendResponse({ success: true });
       } catch (error) {
         sendResponse({ success: false, error: error.message || 'Could not save the list. Please try again.' });

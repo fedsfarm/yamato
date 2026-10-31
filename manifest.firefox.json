@@ -1,8 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Yamato",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Prevents you from being unmotivated",
+  "options_ui": {
+    "page": "settings.html",
+    "open_in_tab": true
+  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "Yamato"

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yamato — Settings</title>
+  <!-- Root, not pages/: pages/* is web-accessible and websites must not frame settings. -->
+  <link rel="stylesheet" href="pages/style.css">
+  <script src="site-modules.js" defer></script>
+  <script src="settings.js" defer></script>
+</head>
+<body>
+  <main class="terminal guide settings">
+    <span class="badge">YAMATO / SETTINGS</span>
+    <h1>Settings</h1>
+    <p>JC replaces flagged media. JCE closes the page. Changes save immediately.</p>
+
+    <h2>Site modules</h2>
+    <label class="setting setting-all"><span>All sites</span><select id="allSites" disabled></select></label>
+    <div class="setting-grid" id="sites"></div>
+
+    <h2>Blocked domains</h2>
+    <label class="setting">
+      <span>Media from blocked domains<small>Images and videos from sites on the blocklist</small></span>
+      <select id="mediaMode" disabled></select>
+    </label>
+
+    <h2>JC sound</h2>
+    <label class="setting">
+      <span>Volume<small>Plays once per replaced image or video</small></span>
+      <span class="range"><input type="range" id="volume" min="0" max="100" step="5" disabled><output id="volumeValue" for="volume">—</output></span>
+    </label>
+
+    <h2>Custom lists</h2>
+    <p>Blocked sites and exceptions in one JSON file. Import adds entries and keeps the ones you have.</p>
+    <div class="actions">
+      <button type="button" id="exportLists">Export</button>
+      <button type="button" id="importLists">Import</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    </div>
+
+    <p class="status" id="status" role="status"></p>
+    <a class="back" href="pages/policies.html">Prevent removal: hardening guide →</a>
+  </main>
+</body>
+</html>

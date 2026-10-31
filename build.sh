@@ -5,6 +5,7 @@ cd "$(dirname "$0")"
 ROOT_FILES=(
   background.html background.js media.css media.js site-modules.js
   offscreen.html offscreen.js popup.html popup.js run.js vergil.png
+  settings.html settings.js
 )
 
 build() {

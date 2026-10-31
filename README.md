@@ -6,7 +6,7 @@
 
 Prevents you from being unmotivated
 
-Version **2.2.0** · [Latest blog post](https://feds.farm/blog/posts/yamato2-2/)
+Version **2.3.0** · [Latest blog post](https://feds.farm/blog/posts/yamato2-2/)
 
 Homepage: [yamato.feds.farm](https://yamato.feds.farm) 
 

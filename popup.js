@@ -414,7 +414,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     const gear = document.createElement('button'); gear.id = 'blockingSettingsBtn'; gear.textContent = '⚙';
     gear.title = 'Settings'; gear.setAttribute('aria-label', 'Settings');
-    gear.addEventListener('click', () => { playClick(); openBlockingSettings(); });
+    gear.addEventListener('click', () => { playClick(); browser.runtime.openOptionsPage().then(() => window.close()); });
     const info = document.createElement('button'); info.id = 'infoBtn'; info.textContent = 'ℹ';
     info.title = 'Info'; info.setAttribute('aria-label', 'Info');
     info.addEventListener('click', () => { playClick(); openInfoPopup(); });
@@ -738,82 +738,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     b.style.background = bg; b.style.borderColor = border; b.style.color = color;
     return b;
   };
-
-  function openBlockingSettings() {
-    const ov = mkOverlay(), box = mkBox();
-    box.classList.add('settings-box');
-    box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Settings'); box.setAttribute('aria-modal', 'true');
-    const title = document.createElement('div'); title.className = 'popup-title'; title.textContent = 'Settings'; box.appendChild(title);
-    const help = document.createElement('p'); help.className = 'settings-help'; help.textContent = 'JC: media · JCE: close page'; box.appendChild(help);
-    const masterRow = document.createElement('label'); masterRow.className = 'settings-master';
-    const masterText = document.createElement('span'); masterText.textContent = 'All sites';
-    const master = document.createElement('select'); master.setAttribute('aria-label', 'All site modules'); master.disabled = true;
-    for (const value of ['off', 'jc', 'jce']) {
-      const option = document.createElement('option'); option.value = value; option.textContent = value === 'off' ? 'Off' : value.toUpperCase(); master.appendChild(option);
-    }
-    masterRow.append(masterText, master); box.appendChild(masterRow);
-    const rows = document.createElement('div'); rows.className = 'settings-grid'; box.appendChild(rows);
-    const status = document.createElement('p'); status.className = 'settings-status'; status.setAttribute('role', 'status'); status.textContent = 'Loading…'; box.appendChild(status);
-    const controls = [];
-    function updateEnabled() { controls.forEach(select => { select.disabled = false; }); }
-    function addRow(label, moduleId, selected) {
-      const row = document.createElement('label'); row.className = 'settings-row';
-      if (!moduleId) row.classList.add('settings-wide');
-      const text = document.createElement('span'); text.textContent = label;
-      const select = document.createElement('select'); select.setAttribute('aria-label', label);
-      for (const value of [...(moduleId ? ['off'] : []), 'jc', 'jce']) {
-        const option = document.createElement('option'); option.value = value; option.textContent = value === 'off' ? 'Off' : value.toUpperCase(); select.appendChild(option);
-      }
-      select.value = selected;
-      select.addEventListener('pointerdown', playClick);
-      select.addEventListener('change', () => {
-        playClick(); select.disabled = true; status.textContent = 'Saving…';
-        browser.runtime.sendMessage({ action: 'setBlockingSetting', moduleId, mode: select.value }, result => {
-          select.disabled = false;
-          if (result?.success) { selected = select.value; status.textContent = 'Saved'; }
-          else { select.value = selected; status.textContent = 'Save failed'; }
-        });
-      });
-      if (moduleId) controls.push(select);
-      row.append(text, select); rows.appendChild(row);
-    }
-    let savedMaster = 'jc';
-    master.addEventListener('change', () => {
-      const selected = master.value;
-      playClick(); master.disabled = true; status.textContent = 'Saving…';
-      browser.runtime.sendMessage({ action: 'setAllSiteModules', mode: selected }, result => {
-        master.disabled = false;
-        if (result?.success) {
-          savedMaster = selected;
-          controls.forEach(select => { select.value = selected; });
-          status.textContent = 'Saved';
-        } else {
-          master.value = savedMaster;
-          status.textContent = 'Save failed';
-        }
-      });
-    });
-    browser.runtime.sendMessage({ action: 'getBlockingSettings' }, result => {
-      if (!result?.success) { status.textContent = 'Load failed'; return; }
-      savedMaster = result.enableSiteModules ? result.siteModules[yamatoSites.definitions[0].id] : 'off';
-      master.value = savedMaster; master.disabled = false;
-      for (const site of yamatoSites.definitions) addRow(site.name, site.id, result.siteModules[site.id]);
-      addRow('Blocked-domain media', null, result.mediaBlockMode);
-      updateEnabled(); status.textContent = '';
-    });
-    const dismiss = () => { playClick(); ov.remove(); document.getElementById('blockingSettingsBtn')?.focus(); };
-    const close = mkBtn('Done'); close.style.width = '100%'; close.addEventListener('click', dismiss); box.appendChild(close);
-    ov.addEventListener('click', event => { if (event.target === ov) dismiss(); });
-    ov.addEventListener('keydown', event => {
-      if (event.key === 'Escape') { event.preventDefault(); dismiss(); }
-      if (event.key === 'Tab') {
-        const focusable = [...box.querySelectorAll('input:not(:disabled), select:not(:disabled), button')];
-        const next = (focusable.indexOf(document.activeElement) + (event.shiftKey ? -1 : 1) + focusable.length) % focusable.length;
-        event.preventDefault(); focusable[next].focus();
-      }
-    });
-    ov.appendChild(box); document.body.appendChild(ov); close.focus();
-  }
 
   function openInfoPopup() {
     const ov = mkOverlay(), box = mkBox();

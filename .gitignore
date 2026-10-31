@@ -11,3 +11,5 @@ release/
 .playwright-mcp/
 *.crx
 *.pem
+*.zip
+*.xpi
